@@ -4,6 +4,7 @@ export interface UseSpeechSynthesisReturn {
   speak: (text: string, lang?: string) => void;
   stop: () => void;
   isSupported: boolean;
+  voicesLoaded: boolean;
 }
 
 export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
@@ -14,6 +15,7 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
   
   // Cache voices when they become available
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
   
   // Load voices - they load asynchronously in most browsers
   useEffect(() => {
@@ -23,7 +25,11 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
       const availableVoices = window.speechSynthesis.getVoices();
       if (availableVoices.length > 0) {
         setVoices(availableVoices);
-        console.log('Loaded voices:', availableVoices.map(v => `${v.name} (${v.lang})`));
+        setVoicesLoaded(true);
+        console.log('Loaded', availableVoices.length, 'voices');
+        // Log Chinese voices specifically
+        const chineseVoices = availableVoices.filter(v => v.lang.startsWith('zh'));
+        console.log('Chinese voices:', chineseVoices.map(v => `${v.name} (${v.lang})`));
       }
     };
     
@@ -39,13 +45,17 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
   }, [isSupported]);
 
   const speak = useCallback((text: string, lang = 'zh-CN') => {
-    if (!isSupported) return;
+    if (!isSupported) {
+      console.warn('Speech synthesis not supported');
+      return;
+    }
+    
     if (!text || typeof text !== 'string') {
       console.warn('Invalid text passed to speak:', text);
       return;
     }
 
-    console.log('Speaking text:', text, 'lang:', lang);
+    console.log('Speaking text:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
 
     // Cancel any ongoing speech
     window.speechSynthesis.cancel();
@@ -56,18 +66,29 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
     utterance.pitch = 1;
     utterance.volume = 1;
 
-    // Find a Chinese voice - prioritize zh-CN voices
-    const chineseVoice = voices.find(voice => voice.lang === 'zh-CN') ||
-                         voices.find(voice => voice.lang.startsWith('zh-CN')) ||
-                         voices.find(voice => voice.lang.startsWith('zh')) ||
-                         voices.find(voice => voice.lang.includes('Chinese'));
+    // Find a Chinese voice - MUST set voice for Chinese to work properly
+    // Priority: zh-CN > zh-TW > any zh voice
+    let selectedVoice: SpeechSynthesisVoice | undefined;
     
-    if (chineseVoice) {
-      console.log('Using voice:', chineseVoice.name, chineseVoice.lang);
-      utterance.voice = chineseVoice;
+    if (voices.length > 0) {
+      selectedVoice = voices.find(voice => voice.lang === 'zh-CN') ||
+                      voices.find(voice => voice.lang === 'zh-TW') ||
+                      voices.find(voice => voice.lang.startsWith('zh-CN')) ||
+                      voices.find(voice => voice.lang.startsWith('zh'));
     } else {
-      console.warn('No Chinese voice found, using default. Available voices:', 
-        voices.map(v => `${v.name} (${v.lang})`));
+      // Try getting voices again directly (fallback)
+      const currentVoices = window.speechSynthesis.getVoices();
+      selectedVoice = currentVoices.find(voice => voice.lang === 'zh-CN') ||
+                      currentVoices.find(voice => voice.lang === 'zh-TW') ||
+                      currentVoices.find(voice => voice.lang.startsWith('zh'));
+    }
+    
+    if (selectedVoice) {
+      console.log('Using Chinese voice:', selectedVoice.name, selectedVoice.lang);
+      utterance.voice = selectedVoice;
+    } else {
+      console.warn('No Chinese voice found! Text may be read incorrectly.');
+      console.warn('Available voices:', voices.map(v => v.lang).join(', '));
     }
 
     // Store in ref to prevent garbage collection
@@ -76,14 +97,6 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
     // Add error handler
     utterance.onerror = (event) => {
       console.error('Speech synthesis error:', event);
-    };
-
-    utterance.onstart = () => {
-      console.log('Speech started');
-    };
-
-    utterance.onend = () => {
-      console.log('Speech ended');
     };
 
     window.speechSynthesis.speak(utterance);
@@ -98,5 +111,6 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
     speak,
     stop,
     isSupported,
+    voicesLoaded,
   };
 }

@@ -304,29 +304,35 @@ function SentenceCard({
     // Handle case where pinyin count doesn't match character count
     let pinyinIndex = 0;
     
+    // Helper to check if character is Chinese (CJK range)
+    const isChineseChar = (char: string) => {
+      const code = char.charCodeAt(0);
+      return (code >= 0x4E00 && code <= 0x9FFF) ||  // CJK Unified Ideographs
+             (code >= 0x3400 && code <= 0x4DBF) ||  // CJK Extension A
+             (code >= 0x20000 && code <= 0x2A6DF);  // CJK Extension B
+    };
+    
     return chars.map((char, index) => {
-      // Skip punctuation - no pinyin needed
-      const isPunctuation = /[\s，。！？、；：""''（）【】《》—…·\.,!?;:'"()\[\]<>-]/.test(char);
-      
-      if (isPunctuation) {
+      // Check if it's a Chinese character (only Chinese chars get pinyin)
+      if (isChineseChar(char)) {
+        const pinyin = pinyinParts[pinyinIndex] || '';
+        pinyinIndex++;
+        
         return (
-          <span key={index} className="inline">
-            {char}
-          </span>
+          <ruby key={index} className="mr-1">
+            <span className="text-2xl">{char}</span>
+            <rp>(</rp>
+            <rt className="text-sm text-amber-600 font-normal">{pinyin}</rt>
+            <rp>)</rp>
+          </ruby>
         );
       }
       
-      // Get corresponding pinyin
-      const pinyin = pinyinParts[pinyinIndex] || '';
-      pinyinIndex++;
-      
+      // Non-Chinese characters (punctuation, numbers, letters) - just display
       return (
-        <ruby key={index} className="mr-1">
-          <span className="text-2xl">{char}</span>
-          <rp>(</rp>
-          <rt className="text-sm text-amber-600 font-normal">{pinyin}</rt>
-          <rp>)</rp>
-        </ruby>
+        <span key={index} className="text-2xl inline">
+          {char}
+        </span>
       );
     });
   };
