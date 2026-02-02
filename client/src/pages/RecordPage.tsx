@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Save, Loader2, AlertCircle, LogOut, Trash2, BookOpen } from 'lucide-react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -14,11 +14,14 @@ type ArticleListItem = {
 export function RecordPage() {
   const navigate = useNavigate();
   const { user, setUser } = useUser();
-  const [editedText, setEditedText] = useState('');
+  const [text, setText] = useState('');  // Single source of truth for committed text
   const [isSaving, setIsSaving] = useState(false);
   const [title, setTitle] = useState('');
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
+  
+  // Track what we've already appended to avoid duplicates
+  const appendedLengthRef = useRef(0);
 
   const {
     transcript,
@@ -30,6 +33,15 @@ export function RecordPage() {
     stopListening,
     resetTranscript,
   } = useSpeechRecognition({ language: 'zh-CN' });
+
+  // Append new finalized speech to text (includes punctuation from pauses)
+  useEffect(() => {
+    if (transcript.length > appendedLengthRef.current) {
+      const newText = transcript.slice(appendedLengthRef.current);
+      setText(prev => prev + newText);
+      appendedLengthRef.current = transcript.length;
+    }
+  }, [transcript]);
 
   // Load articles on mount
   useEffect(() => {
@@ -60,12 +72,8 @@ export function RecordPage() {
     }
   };
 
-  // Combine transcript with edited text
-  const displayText = editedText || transcript;
-  const fullText = displayText + interimTranscript;
-
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditedText(e.target.value);
+    setText(e.target.value);
   };
 
   const handleLogout = () => {
@@ -74,24 +82,28 @@ export function RecordPage() {
   };
 
   const handleSave = async () => {
-    const textToSave = editedText || transcript;
+    // Flush any pending transcript before saving
+    const pendingText = transcript.slice(appendedLengthRef.current);
+    const textToSave = text + pendingText;
+    
     if (!textToSave.trim()) return;
 
     setIsSaving(true);
     try {
       const { id } = await createArticle(textToSave, title || undefined);
       navigate(`/article/${id}`);
+      // Don't setIsSaving(false) here - component will unmount
     } catch (err) {
       console.error('Failed to save:', err);
       alert('Failed to save article. Please try again.');
-    } finally {
-      setIsSaving(false);
+      setIsSaving(false);  // Only reset on error since we stay on page
     }
   };
 
   const handleReset = () => {
     resetTranscript();
-    setEditedText('');
+    appendedLengthRef.current = 0;
+    setText('');
     setTitle('');
   };
 
@@ -208,13 +220,8 @@ export function RecordPage() {
             Transcription (click to edit)
           </label>
           <textarea
-            value={fullText}
+            value={text}
             onChange={handleTextChange}
-            onFocus={() => {
-              if (!editedText && transcript) {
-                setEditedText(transcript);
-              }
-            }}
             placeholder="Your Chinese transcription will appear here...
 
 Click 'Start Recording' and speak in Chinese, or type/paste text directly."
@@ -222,11 +229,21 @@ Click 'Start Recording' and speak in Chinese, or type/paste text directly."
             style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
           />
           
-          {/* Character count */}
+          {/* Show interim transcript below textarea */}
+          {interimTranscript && (
+            <div 
+              className="mt-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xl text-amber-700"
+              style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+            >
+              <span className="animate-pulse">🎤</span> {interimTranscript}...
+            </div>
+          )}
+          
+          {/* Character count and status */}
           <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
-            <span>{fullText.length} characters</span>
-            {interimTranscript && (
-              <span className="text-amber-600">Processing speech...</span>
+            <span>{text.length} characters</span>
+            {isListening && !interimTranscript && (
+              <span className="text-amber-600 animate-pulse">🎤 Listening...</span>
             )}
           </div>
         </div>
@@ -235,7 +252,7 @@ Click 'Start Recording' and speak in Chinese, or type/paste text directly."
         <div className="flex justify-center gap-4">
           <button
             onClick={handleReset}
-            disabled={!fullText && !title}
+            disabled={!text && !title}
             className="px-6 py-3 rounded-xl font-semibold text-gray-600 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Clear All
@@ -243,7 +260,7 @@ Click 'Start Recording' and speak in Chinese, or type/paste text directly."
           
           <button
             onClick={handleSave}
-            disabled={!fullText.trim() || isSaving}
+            disabled={!text.trim() || isSaving}
             className="flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-white bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
           >
             {isSaving ? (
