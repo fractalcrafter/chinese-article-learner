@@ -71,3 +71,22 @@ export async function processArticle(id: number): Promise<{
   if (!response.ok) throw new Error('Failed to process article');
   return response.json();
 }
+
+// Add vocabulary manually - server will auto-generate pinyin and translate
+export async function addVocabulary(articleId: number, chinese: string): Promise<Vocabulary> {
+  const response = await fetch(`${API_BASE}/articles/${articleId}/vocabulary`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chinese }),
+  });
+  if (!response.ok) throw new Error('Failed to add vocabulary');
+  return response.json();
+}
+
+// Delete vocabulary
+export async function deleteVocabulary(articleId: number, vocabId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/articles/${articleId}/vocabulary/${vocabId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete vocabulary');
+}

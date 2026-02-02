@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Volume2, Loader2, BookOpen, GraduationCap } from 'lucide-react';
-import { getArticle, processArticle } from '../lib/api';
+import { ArrowLeft, Volume2, Loader2, BookOpen, GraduationCap, Plus, X } from 'lucide-react';
+import { getArticle, processArticle, addVocabulary, deleteVocabulary } from '../lib/api';
 import type { Article, Sentence } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 import { VocabularyCard } from '../components/VocabularyCard';
@@ -16,6 +16,8 @@ export function ArticlePage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'article' | 'vocabulary'>('article');
+  const [newVocab, setNewVocab] = useState('');
+  const [isAddingVocab, setIsAddingVocab] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -63,6 +65,39 @@ export function ArticlePage() {
 
   const handleSpeak = (text: string) => {
     speak(text, 'zh-CN');
+  };
+
+  const handleAddVocab = async () => {
+    if (!id || !newVocab.trim()) return;
+    
+    setIsAddingVocab(true);
+    try {
+      const vocab = await addVocabulary(parseInt(id), newVocab.trim());
+      setArticle(prev => prev ? {
+        ...prev,
+        vocabulary: [...(prev.vocabulary || []), vocab],
+      } : null);
+      setNewVocab('');
+    } catch (err) {
+      console.error('Failed to add vocabulary:', err);
+      alert('Failed to add vocabulary');
+    } finally {
+      setIsAddingVocab(false);
+    }
+  };
+
+  const handleDeleteVocab = async (vocabId: number) => {
+    if (!id) return;
+    
+    try {
+      await deleteVocabulary(parseInt(id), vocabId);
+      setArticle(prev => prev ? {
+        ...prev,
+        vocabulary: prev.vocabulary?.filter(v => v.id !== vocabId) || [],
+      } : null);
+    } catch (err) {
+      console.error('Failed to delete vocabulary:', err);
+    }
   };
 
   if (isLoading) {
@@ -184,22 +219,62 @@ export function ArticlePage() {
 
         {/* Vocabulary Tab */}
         {activeTab === 'vocabulary' && (
-          <div>
+          <div className="space-y-6">
+            {/* Add Vocabulary Form */}
+            <div className="bg-white rounded-xl shadow-md p-4">
+              <h3 className="text-lg font-semibold text-amber-800 mb-3">➕ Add Vocabulary</h3>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newVocab}
+                  onChange={(e) => setNewVocab(e.target.value)}
+                  placeholder="Enter Chinese word (e.g., 学习)"
+                  className="flex-1 px-4 py-2 border-2 border-amber-200 rounded-lg focus:border-amber-400 focus:outline-none text-lg"
+                  style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddVocab()}
+                />
+                <button
+                  onClick={handleAddVocab}
+                  disabled={!newVocab.trim() || isAddingVocab}
+                  className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isAddingVocab ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Plus className="w-5 h-5" />
+                  )}
+                  Add
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Pinyin and English translation will be generated automatically
+              </p>
+            </div>
+
+            {/* Vocabulary List */}
             {article.vocabulary && article.vocabulary.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {article.vocabulary.map((vocab) => (
-                  <VocabularyCard 
-                    key={vocab.id} 
-                    vocabulary={vocab}
-                    onSpeak={handleSpeak}
-                  />
+                  <div key={vocab.id} className="relative">
+                    <VocabularyCard 
+                      vocabulary={vocab}
+                      onSpeak={handleSpeak}
+                    />
+                    <button
+                      onClick={() => handleDeleteVocab(vocab.id)}
+                      className="absolute top-2 right-2 p-1 bg-red-100 hover:bg-red-200 rounded-full text-red-600"
+                      title="Remove vocabulary"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 ))}
               </div>
             ) : (
               <div className="bg-white rounded-xl p-8 text-center">
                 <GraduationCap className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-600">
-                  {isProcessing ? 'Extracting vocabulary...' : 'No vocabulary extracted yet'}
+                  No vocabulary yet. Add words above to start learning!
                 </p>
               </div>
             )}

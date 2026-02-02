@@ -127,4 +127,65 @@ router.post('/:id/process', async (req, res) => {
         res.status(500).json({ error: 'Failed to process article' });
     }
 });
+// Add vocabulary manually
+router.post('/:id/vocabulary', async (req, res) => {
+    try {
+        const articleId = parseInt(req.params.id);
+        const { chinese } = req.body;
+        if (!chinese || !chinese.trim()) {
+            return res.status(400).json({ error: 'Chinese word is required' });
+        }
+        // Import the functions we need
+        const { getPinyin, translateText } = await import('../services/ai.js');
+        // Generate pinyin
+        const pinyin = getPinyin(chinese.trim());
+        // Translate to English
+        let english = '';
+        try {
+            english = await translateText(chinese.trim());
+        }
+        catch (e) {
+            console.error('Translation failed:', e);
+            english = '(Translation unavailable)';
+        }
+        // Create or get vocabulary entry
+        const vocab = getOrCreateVocabulary(chinese.trim());
+        // Update with pinyin and English
+        updateVocabulary(vocab.id, {
+            pinyin,
+            english,
+            example_sentence: '',
+            emoji: '📝'
+        });
+        // Link to article
+        linkVocabularyToArticle(articleId, vocab.id);
+        // Return the vocabulary item
+        res.json({
+            id: vocab.id,
+            chinese: chinese.trim(),
+            pinyin,
+            english,
+            example_sentence: '',
+            emoji: '📝'
+        });
+    }
+    catch (error) {
+        console.error('Error adding vocabulary:', error);
+        res.status(500).json({ error: 'Failed to add vocabulary' });
+    }
+});
+// Delete vocabulary from article
+router.delete('/:id/vocabulary/:vocabId', (req, res) => {
+    try {
+        const articleId = parseInt(req.params.id);
+        const vocabId = parseInt(req.params.vocabId);
+        // Remove the link between article and vocabulary
+        db.prepare('DELETE FROM article_vocabulary WHERE article_id = ? AND vocabulary_id = ?').run(articleId, vocabId);
+        res.json({ success: true });
+    }
+    catch (error) {
+        console.error('Error deleting vocabulary:', error);
+        res.status(500).json({ error: 'Failed to delete vocabulary' });
+    }
+});
 export default router;

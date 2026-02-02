@@ -140,7 +140,7 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 
 ---
 
-## Current Status (Updated 2026-02-02 ~5:30pm PST)
+## Current Status (Updated 2026-02-02 ~5:50pm PST)
 
 ### ✅ MVP Complete
 - Speech-to-text transcription (Chinese)
@@ -153,6 +153,7 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 - **Live URL**: https://monkeymonkey.azurewebsites.net
 - Auto-deploys from GitHub `master` branch
 - Reused existing App Service Plan (ASP-speakuniverserg-8ca8)
+- **Check deployment status**: Azure Portal → Deployment Center → Logs
 
 ### 🔧 Deployment Issues Fixed (2026-02-02)
 | Issue | Root Cause | Fix Applied |
@@ -162,6 +163,13 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 | Publish profile auth failed | Basic auth disabled | Used Deployment Center → GitHub |
 | App wouldn't start | No startup command | Set `node server/dist/index.js` |
 | PathError on `'*'` route | Express 5.x breaking change | Changed to `'/{*splat}'` |
+
+### 🔧 Post-Deployment Improvements (2026-02-02 evening)
+| Feature | Description |
+|---------|-------------|
+| Browser compatibility tip | Shows "use Chrome" hint when Edge speech fails |
+| Improved speech recognition | Auto-restart on pause, adds punctuation, better error handling |
+| Ruby pinyin annotations | Pinyin displayed above each Chinese character (not separate line)
 
 ### 📝 Lessons Learned
 1. **Test production build locally** before deploying: `npm run build && npm start`
