@@ -129,8 +129,13 @@ export async function registerUser(name: string, password: string, avatarEmoji?:
     body: JSON.stringify({ name, password, avatarEmoji }),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to register');
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to register');
+    }
+    throw new Error(`Server error: ${response.status}`);
   }
   return response.json();
 }
@@ -143,8 +148,12 @@ export async function loginUser(name: string, password: string): Promise<User> {
     body: JSON.stringify({ name, password }),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to login');
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to login');
+    }
+    throw new Error(`Server error: ${response.status}`);
   }
   return response.json();
 }
