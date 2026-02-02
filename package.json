@@ -1,0 +1,12 @@
+{
+  "name": "chinese-article-learner",
+  "version": "1.0.0",
+  "description": "Chinese Article Learning App",
+  "scripts": {
+    "build": "cd client && npm install && npm run build && cd ../server && npm install && npm run build",
+    "start": "node server/dist/index.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
