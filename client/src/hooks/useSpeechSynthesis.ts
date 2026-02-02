@@ -6,6 +6,9 @@ export interface UseSpeechSynthesisReturn {
   isSupported: boolean;
   voicesLoaded: boolean;
   hasChineseVoice: boolean;
+  chineseVoices: SpeechSynthesisVoice[];
+  selectedVoice: SpeechSynthesisVoice | null;
+  setSelectedVoice: (voice: SpeechSynthesisVoice | null) => void;
 }
 
 export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
@@ -18,6 +21,8 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voicesLoaded, setVoicesLoaded] = useState(false);
   const [hasChineseVoice, setHasChineseVoice] = useState(false);
+  const [chineseVoices, setChineseVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
   
   // Load voices - they load asynchronously in most browsers
   useEffect(() => {
@@ -29,14 +34,25 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
         setVoices(availableVoices);
         setVoicesLoaded(true);
         
-        // Check for Chinese voices
-        const chineseVoices = availableVoices.filter(v => v.lang.startsWith('zh'));
-        setHasChineseVoice(chineseVoices.length > 0);
+        // Filter Chinese voices
+        const zhVoices = availableVoices.filter(v => v.lang.startsWith('zh'));
+        setChineseVoices(zhVoices);
+        setHasChineseVoice(zhVoices.length > 0);
         
         console.log('Loaded', availableVoices.length, 'voices');
-        console.log('Chinese voices:', chineseVoices.map(v => `${v.name} (${v.lang})`));
+        console.log('Chinese voices:', zhVoices.map(v => `${v.name} (${v.lang})`));
         
-        if (chineseVoices.length === 0) {
+        // Auto-select best Chinese voice if none selected
+        if (!selectedVoice && zhVoices.length > 0) {
+          // Prefer Natural/Online voices, then zh-CN, then any zh
+          const preferred = zhVoices.find(v => v.name.includes('Natural')) ||
+                           zhVoices.find(v => v.name.includes('Online')) ||
+                           zhVoices.find(v => v.lang === 'zh-CN') ||
+                           zhVoices[0];
+          setSelectedVoice(preferred);
+        }
+        
+        if (zhVoices.length === 0) {
           console.warn('No Chinese voice available! Install Chinese language pack in Windows Settings > Language.');
         }
       }
@@ -75,23 +91,21 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
     utterance.pitch = 1;
     utterance.volume = 1;
 
-    // Find a Chinese voice - MUST set voice for Chinese to work properly
-    // Get fresh voices list each time (in case they loaded after component mounted)
-    const currentVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
-    
-    // Priority: Microsoft Chinese voices (best quality) > other zh-CN > zh-TW > any zh
-    let selectedVoice = currentVoices.find(v => v.lang === 'zh-CN' && v.name.includes('Microsoft')) ||
-                        currentVoices.find(v => v.lang === 'zh-CN') ||
-                        currentVoices.find(v => v.lang === 'zh-TW') ||
-                        currentVoices.find(v => v.lang.startsWith('zh'));
-    
+    // Use selected voice if available, otherwise find one
     if (selectedVoice) {
-      console.log('Using Chinese voice:', selectedVoice.name, selectedVoice.lang);
+      console.log('Using selected voice:', selectedVoice.name, selectedVoice.lang);
       utterance.voice = selectedVoice;
     } else {
-      console.warn('No Chinese voice found! Speech may be incorrect.');
-      console.warn('Available voices:', currentVoices.map(v => `${v.name}(${v.lang})`).join(', '));
-      // Still try to speak - lang setting might help on some systems
+      // Fallback: try to find a Chinese voice
+      const currentVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
+      const fallbackVoice = currentVoices.find(v => v.lang === 'zh-CN') ||
+                            currentVoices.find(v => v.lang.startsWith('zh'));
+      if (fallbackVoice) {
+        console.log('Using fallback voice:', fallbackVoice.name, fallbackVoice.lang);
+        utterance.voice = fallbackVoice;
+      } else {
+        console.warn('No Chinese voice found! Speech may be incorrect.');
+      }
     }
 
     // Store in ref to prevent garbage collection
@@ -105,7 +119,7 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
     };
 
     window.speechSynthesis.speak(utterance);
-  }, [isSupported, voices]);
+  }, [isSupported, voices, selectedVoice]);
 
   const stop = useCallback(() => {
     if (!isSupported) return;
@@ -118,5 +132,8 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
     isSupported,
     voicesLoaded,
     hasChineseVoice,
+    chineseVoices,
+    selectedVoice,
+    setSelectedVoice,
   };
 }

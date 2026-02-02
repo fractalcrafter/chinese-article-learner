@@ -9,7 +9,7 @@ import { VocabularyCard } from '../components/VocabularyCard';
 export function ArticlePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { speak } = useSpeechSynthesis();
+  const { speak, chineseVoices, selectedVoice, setSelectedVoice, hasChineseVoice } = useSpeechSynthesis();
 
   const [article, setArticle] = useState<Article | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -207,6 +207,41 @@ export function ArticlePage() {
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
                 <h2 className="text-lg font-semibold text-blue-800 mb-2">📝 Summary</h2>
                 <p className="text-blue-900">{article.summary}</p>
+              </div>
+            )}
+
+            {/* Voice Selector */}
+            {chineseVoices.length > 0 && (
+              <div className="flex items-center gap-3 bg-white rounded-xl p-4 shadow-sm">
+                <Volume2 className="w-5 h-5 text-amber-600" />
+                <label className="text-sm font-medium text-gray-700">Voice:</label>
+                <select
+                  value={selectedVoice?.name || ''}
+                  onChange={(e) => {
+                    const voice = chineseVoices.find(v => v.name === e.target.value);
+                    setSelectedVoice(voice || null);
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  {chineseVoices.map((voice) => (
+                    <option key={voice.name} value={voice.name}>
+                      {voice.name} ({voice.lang})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => speak('你好，欢迎学习中文')}
+                  className="px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded-lg text-amber-700 text-sm font-medium transition-colors"
+                >
+                  Test
+                </button>
+              </div>
+            )}
+            
+            {/* No Chinese voice warning */}
+            {!hasChineseVoice && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-800 text-sm">
+                ⚠️ No Chinese voice found. Install Chinese language in Windows Settings → Language → Add language → Chinese (Simplified) → Text-to-speech
               </div>
             )}
 
