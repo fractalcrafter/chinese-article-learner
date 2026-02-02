@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { initDatabase } from './db.js';
 import articlesRouter from './routes/articles.js';
 import vocabularyRouter from './routes/vocabulary.js';
+import authRouter from './routes/auth.js';
 // Load environment variables
 dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,7 @@ initDatabase();
 // API Routes
 app.use('/api/articles', articlesRouter);
 app.use('/api/vocabulary', vocabularyRouter);
+app.use('/api/auth', authRouter);
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

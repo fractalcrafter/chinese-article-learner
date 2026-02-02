@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Save, Loader2, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Save, Loader2, AlertCircle, LogOut } from 'lucide-react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { createArticle } from '../lib/api';
+import { useUser } from '../contexts/UserContext';
 
 export function RecordPage() {
   const navigate = useNavigate();
+  const { user, setUser } = useUser();
   const [editedText, setEditedText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [title, setTitle] = useState('');
@@ -27,6 +29,11 @@ export function RecordPage() {
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setEditedText(e.target.value);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    navigate('/login');
   };
 
   const handleSave = async () => {
@@ -70,6 +77,23 @@ export function RecordPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50">
       <div className="container mx-auto px-4 py-8 max-w-3xl">
+        {/* User Header */}
+        {user && (
+          <div className="flex items-center justify-between mb-4 bg-white rounded-xl p-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{user.avatar_emoji}</span>
+              <span className="font-medium text-gray-700">{user.name}</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1 px-3 py-1 text-gray-500 hover:text-red-500 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm">Logout</span>
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-amber-800 mb-2">

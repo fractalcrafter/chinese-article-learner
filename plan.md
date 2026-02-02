@@ -169,8 +169,9 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 |---------|-------------|
 | Browser compatibility tip | Shows "use Chrome" hint when Edge speech fails |
 | Improved speech recognition | Auto-restart on pause, adds punctuation, better error handling |
-| Ruby pinyin annotations | Pinyin displayed above each Chinese character (not separate line) |
+| Ruby pinyin annotations | Pinyin displayed above each Chinese character (fixed alignment) |
 | Manual vocabulary input | Add Chinese words manually - auto-generates pinyin + English translation |
+| Speech synthesis fix | Fixed TTS not working (voices loaded async, utterance GC prevention) |
 
 ### 📝 Lessons Learned
 1. **Test production build locally** before deploying: `npm run build && npm start`

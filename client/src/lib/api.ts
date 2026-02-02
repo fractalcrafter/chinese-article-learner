@@ -90,3 +90,96 @@ export async function deleteVocabulary(articleId: number, vocabId: number): Prom
   });
   if (!response.ok) throw new Error('Failed to delete vocabulary');
 }
+
+// ============ Auth & User API ============
+
+export type User = {
+  id: number;
+  name: string;
+  avatar_emoji: string;
+  created_at: string;
+}
+
+export type UserProgress = {
+  articles: {
+    total_articles: number;
+    completed_articles: number;
+    total_sentences_read: number;
+  };
+  vocabulary: {
+    total_vocab: number;
+    mastered_vocab: number;
+    reviewing_vocab: number;
+    total_reviews: number;
+  };
+}
+
+// Get all users (for family selection)
+export async function getUsers(): Promise<User[]> {
+  const response = await fetch(`${API_BASE}/auth/users`);
+  if (!response.ok) throw new Error('Failed to fetch users');
+  return response.json();
+}
+
+// Register new user
+export async function registerUser(name: string, password: string, avatarEmoji?: string): Promise<User> {
+  const response = await fetch(`${API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, password, avatarEmoji }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to register');
+  }
+  return response.json();
+}
+
+// Login
+export async function loginUser(name: string, password: string): Promise<User> {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, password }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to login');
+  }
+  return response.json();
+}
+
+// Get user progress
+export async function getUserProgress(userId: number): Promise<UserProgress> {
+  const response = await fetch(`${API_BASE}/auth/users/${userId}/progress`);
+  if (!response.ok) throw new Error('Failed to fetch progress');
+  return response.json();
+}
+
+// Update article progress
+export async function updateArticleProgress(
+  userId: number, 
+  articleId: number, 
+  data: { completed?: boolean; sentencesRead?: number }
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/auth/users/${userId}/article-progress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ articleId, ...data }),
+  });
+  if (!response.ok) throw new Error('Failed to update progress');
+}
+
+// Update vocabulary progress
+export async function updateVocabularyProgress(
+  userId: number,
+  vocabularyId: number,
+  correct: boolean
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/auth/users/${userId}/vocabulary-progress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ vocabularyId, correct }),
+  });
+  if (!response.ok) throw new Error('Failed to update progress');
+}
