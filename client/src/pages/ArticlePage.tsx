@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Volume2, Loader2, BookOpen, GraduationCap, Plus, X } from 'lucide-react';
-import { getArticle, processArticle, addVocabulary, deleteVocabulary } from '../lib/api';
+import { ArrowLeft, Volume2, Loader2, BookOpen, GraduationCap, Plus, X, Trash2 } from 'lucide-react';
+import { getArticle, processArticle, addVocabulary, deleteVocabulary, deleteArticle } from '../lib/api';
 import type { Article, Sentence } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 import { VocabularyCard } from '../components/VocabularyCard';
@@ -101,6 +101,19 @@ export function ArticlePage() {
     }
   };
 
+  const handleDeleteArticle = async () => {
+    if (!id) return;
+    if (!confirm('Delete this article? This cannot be undone.')) return;
+    
+    try {
+      await deleteArticle(parseInt(id));
+      navigate('/');
+    } catch (err) {
+      console.error('Failed to delete article:', err);
+      alert('Failed to delete article');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50 flex items-center justify-center">
@@ -129,16 +142,26 @@ export function ArticlePage() {
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/')}
+              className="p-2 hover:bg-amber-200 rounded-full transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6 text-amber-800" />
+            </button>
+            <h1 className="text-2xl font-bold text-amber-800">
+              {article.title || 'Untitled Article'}
+            </h1>
+          </div>
           <button
-            onClick={() => navigate('/')}
-            className="p-2 hover:bg-amber-200 rounded-full transition-colors"
+            onClick={handleDeleteArticle}
+            className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete article"
           >
-            <ArrowLeft className="w-6 h-6 text-amber-800" />
+            <Trash2 className="w-5 h-5" />
+            <span className="hidden sm:inline">Delete</span>
           </button>
-          <h1 className="text-2xl font-bold text-amber-800">
-            {article.title || 'Untitled Article'}
-          </h1>
         </div>
 
         {/* Processing State */}

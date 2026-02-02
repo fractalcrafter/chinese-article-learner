@@ -103,6 +103,22 @@ export function useSpeechRecognition(
   const isSupported = typeof window !== 'undefined' && 
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
 
+  // Helper to safely schedule restart, clearing any existing timeout first
+  const scheduleRestart = (delay: number, onFail?: () => void) => {
+    if (restartTimeoutRef.current) {
+      clearTimeout(restartTimeoutRef.current);
+    }
+    restartTimeoutRef.current = setTimeout(() => {
+      if (!shouldRestartRef.current || !recognitionRef.current) return;
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        console.warn('Restart failed:', e);
+        if (onFail) onFail();
+      }
+    }, delay);
+  };
+
   // Keep ref in sync with state
   useEffect(() => {
     isListeningRef.current = isListening;
@@ -144,17 +160,13 @@ export function useSpeechRecognition(
       
       // Don't show error for "no-speech" - just restart
       if (event.error === 'no-speech') {
-        // Auto-restart after no speech detected
         if (shouldRestartRef.current) {
-          restartTimeoutRef.current = setTimeout(() => {
-            if (shouldRestartRef.current && recognitionRef.current) {
-              try {
-                recognitionRef.current.start();
-              } catch (e) {
-                // Ignore
-              }
-            }
-          }, 100);
+          scheduleRestart(300, () => {
+            scheduleRestart(1000, () => {
+              setError('Speech stopped. Click to restart.');
+              setIsListening(false);
+            });
+          });
         }
         return;
       }
@@ -162,15 +174,19 @@ export function useSpeechRecognition(
       // For "aborted" error, just try to restart
       if (event.error === 'aborted') {
         if (shouldRestartRef.current) {
-          restartTimeoutRef.current = setTimeout(() => {
-            if (shouldRestartRef.current && recognitionRef.current) {
-              try {
-                recognitionRef.current.start();
-              } catch (e) {
-                // Ignore
-              }
-            }
-          }, 100);
+          scheduleRestart(300);
+        }
+        return;
+      }
+      
+      // Network errors are common - allow retry
+      if (event.error === 'network') {
+        if (shouldRestartRef.current) {
+          setError('Network issue - retrying...');
+          scheduleRestart(2000, () => {
+            setError('network');
+            setIsListening(false);
+          });
         }
         return;
       }
@@ -188,27 +204,15 @@ export function useSpeechRecognition(
         // Add punctuation to mark the pause
         setTranscript(prev => addChinesePunctuation(prev));
         
-        // Restart after a brief delay
-        restartTimeoutRef.current = setTimeout(() => {
-          if (shouldRestartRef.current && recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-            } catch (e) {
-              console.warn('Failed to restart recognition:', e);
-              // If restart fails, try again after a longer delay
-              restartTimeoutRef.current = setTimeout(() => {
-                if (shouldRestartRef.current && recognitionRef.current) {
-                  try {
-                    recognitionRef.current.start();
-                  } catch (e2) {
-                    // Give up and mark as stopped
-                    setIsListening(false);
-                  }
-                }
-              }, 500);
-            }
-          }
-        }, 100);
+        // Restart with exponential backoff on failure
+        scheduleRestart(300, () => {
+          scheduleRestart(1000, () => {
+            scheduleRestart(2000, () => {
+              setError('Speech stopped. Click "Start Recording" to continue.');
+              setIsListening(false);
+            });
+          });
+        });
       } else {
         setIsListening(false);
       }
@@ -221,6 +225,7 @@ export function useSpeechRecognition(
     recognitionRef.current = recognition;
 
     return () => {
+      shouldRestartRef.current = false;  // Prevent post-unmount restarts
       if (restartTimeoutRef.current) {
         clearTimeout(restartTimeoutRef.current);
       }
