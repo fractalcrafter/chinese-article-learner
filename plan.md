@@ -124,7 +124,9 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 - [ ] Add analytics tracking (built-in)
 - [ ] Write deployment guide
 - [x] Deploy to Azure App Service
-- [ ] Test end-to-end flow
+- [x] Fix SQLite path for Azure persistence (`/home/data/`)
+- [x] Fix Express 5.x catch-all route syntax (`'/{*splat}'`)
+- [x] Test end-to-end flow on live site ✅ (2026-02-02 5:33pm PST)
 - [ ] Create quick-start guide for family use
 
 ---
@@ -138,7 +140,7 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 
 ---
 
-## Current Status (Updated 2026-02-02)
+## Current Status (Updated 2026-02-02 ~5:30pm PST)
 
 ### ✅ MVP Complete
 - Speech-to-text transcription (Chinese)
@@ -146,7 +148,26 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 - Sentence breakdown with pinyin + English translation
 - Text-to-speech read-aloud (Chinese voice)
 - Vocabulary card UI with Hanzi stroke animations
-- Azure deployment (in progress)
+
+### ✅ Azure Deployment Complete
+- **Live URL**: https://monkeymonkey.azurewebsites.net
+- Auto-deploys from GitHub `master` branch
+- Reused existing App Service Plan (ASP-speakuniverserg-8ca8)
+
+### 🔧 Deployment Issues Fixed (2026-02-02)
+| Issue | Root Cause | Fix Applied |
+|-------|------------|-------------|
+| SQLite data lost on restart | Relative path `./data/` is ephemeral | Use `/home/data/` on Azure |
+| Build files not deployed | `dist/` in `.gitignore` | Removed from `.gitignore`, committed builds |
+| Publish profile auth failed | Basic auth disabled | Used Deployment Center → GitHub |
+| App wouldn't start | No startup command | Set `node server/dist/index.js` |
+| PathError on `'*'` route | Express 5.x breaking change | Changed to `'/{*splat}'` |
+
+### 📝 Lessons Learned
+1. **Test production build locally** before deploying: `npm run build && npm start`
+2. **Express 5.x changed catch-all syntax** - AI generates outdated Express 4.x code
+3. **Azure SQLite must use `/home/data/`** - only persistent storage location
+4. **Deployment Center > publish profiles** - simpler, no auth issues
 
 ### ⏳ Needs API Key (Optional)
 - AI-powered summaries (needs Azure OpenAI)

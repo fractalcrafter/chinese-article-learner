@@ -131,7 +131,13 @@ export function RecordPage() {
         {/* Error */}
         {error && (
           <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-xl mb-4">
-            Error: {error}
+            <p className="font-medium">Error: {error}</p>
+            {error === 'network' && (
+              <p className="text-sm mt-1">
+                💡 Tip: Speech recognition works best in <strong>Chrome</strong>. 
+                You can also paste Chinese text directly below.
+              </p>
+            )}
           </div>
         )}
 
