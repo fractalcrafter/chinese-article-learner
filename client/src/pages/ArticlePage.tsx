@@ -218,25 +218,57 @@ function SentenceCard({
   sentence: Sentence; 
   onSpeak: (text: string) => void;
 }) {
+  // Parse pinyin and match with Chinese characters
+  // Pinyin is typically space-separated, one per character/word
+  const renderChineseWithPinyin = () => {
+    const chars = sentence.chinese.split('');
+    const pinyinParts = sentence.pinyin.split(/\s+/);
+    
+    // Try to match pinyin to characters
+    // Handle case where pinyin count doesn't match character count
+    let pinyinIndex = 0;
+    
+    return chars.map((char, index) => {
+      // Skip punctuation - no pinyin needed
+      const isPunctuation = /[\s，。！？、；：""''（）【】《》—…·\.,!?;:'"()\[\]<>-]/.test(char);
+      
+      if (isPunctuation) {
+        return (
+          <span key={index} className="inline">
+            {char}
+          </span>
+        );
+      }
+      
+      // Get corresponding pinyin
+      const pinyin = pinyinParts[pinyinIndex] || '';
+      pinyinIndex++;
+      
+      return (
+        <ruby key={index} className="inline-block">
+          <span className="text-2xl">{char}</span>
+          <rp>(</rp>
+          <rt className="text-sm text-amber-600 font-normal">{pinyin}</rt>
+          <rp>)</rp>
+        </ruby>
+      );
+    });
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          {/* Chinese */}
+          {/* Chinese with Pinyin above each character */}
           <p 
-            className="text-2xl font-medium text-gray-900 mb-2"
+            className="font-medium text-gray-900 mb-4 leading-loose"
             style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
           >
-            {sentence.chinese}
-          </p>
-          
-          {/* Pinyin */}
-          <p className="text-lg text-amber-600 mb-2">
-            {sentence.pinyin}
+            {renderChineseWithPinyin()}
           </p>
           
           {/* English */}
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-lg">
             {sentence.english}
           </p>
         </div>
