@@ -30,7 +30,8 @@ app.get('/api/health', (req, res) => {
 const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
 app.use(express.static(clientDistPath));
 // Handle React routing - serve index.html for all non-API routes
-app.get('*', (req, res) => {
+// Note: Express 5.x requires '/{*splat}' instead of '*' for catch-all routes
+app.get('/{*splat}', (req, res) => {
     res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 // Start server
