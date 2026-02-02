@@ -320,7 +320,7 @@ function SentenceCard({
       pinyinIndex++;
       
       return (
-        <ruby key={index} className="inline-block">
+        <ruby key={index}>
           <span className="text-2xl">{char}</span>
           <rp>(</rp>
           <rt className="text-sm text-amber-600 font-normal">{pinyin}</rt>
