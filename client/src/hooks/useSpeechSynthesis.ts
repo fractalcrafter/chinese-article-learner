@@ -34,13 +34,26 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
         setVoices(availableVoices);
         setVoicesLoaded(true);
         
-        // Filter Chinese voices
-        const zhVoices = availableVoices.filter(v => v.lang.startsWith('zh'));
+        // Filter Chinese voices - catch various formats (zh-CN, zh-TW, zh_CN, Chinese, etc.)
+        const zhVoices = availableVoices.filter(v => 
+          v.lang.startsWith('zh') || 
+          v.lang.includes('Chinese') ||
+          v.name.includes('Chinese') ||
+          v.name.includes('Xiaoxiao') ||
+          v.name.includes('Yunyang') ||
+          v.name.includes('Huihui') ||
+          v.name.includes('Kangkang') ||
+          v.name.includes('Yaoyao') ||
+          v.name.includes('Yunxi')
+        );
         setChineseVoices(zhVoices);
         setHasChineseVoice(zhVoices.length > 0);
         
-        console.log('Loaded', availableVoices.length, 'voices');
+        console.log('Loaded', availableVoices.length, 'total voices');
+        console.log('Chinese voices found:', zhVoices.length);
         console.log('Chinese voices:', zhVoices.map(v => `${v.name} (${v.lang})`));
+        // Also log all voices for debugging
+        console.log('All voices:', availableVoices.map(v => `${v.name} (${v.lang})`));
         
         // Auto-select best Chinese voice if none selected
         if (!selectedVoice && zhVoices.length > 0) {
