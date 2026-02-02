@@ -119,13 +119,43 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 - [ ] Create flashcard review mode
 
 ### Phase 6: Polish & Deployment
-- [ ] Add loading states and error handling throughout
+- [x] Add loading states and error handling throughout
 - [ ] Implement responsive design for tablet use
 - [ ] Add analytics tracking (built-in)
 - [ ] Write deployment guide
-- [ ] Deploy to Azure App Service
+- [x] Deploy to Azure App Service
 - [ ] Test end-to-end flow
 - [ ] Create quick-start guide for family use
+
+---
+
+## Deployment Info
+
+- **GitHub Repo**: https://github.com/fractalcrafter/chinese-article-learner
+- **Azure Web App**: monkeymonkey
+- **Live URL**: https://monkeymonkey.azurewebsites.net
+- **Auto-deploy**: Connected to GitHub `master` branch
+
+---
+
+## Current Status (Updated 2026-02-02)
+
+### ✅ MVP Complete
+- Speech-to-text transcription (Chinese)
+- Editable transcription with save
+- Sentence breakdown with pinyin + English translation
+- Text-to-speech read-aloud (Chinese voice)
+- Vocabulary card UI with Hanzi stroke animations
+- Azure deployment (in progress)
+
+### ⏳ Needs API Key (Optional)
+- AI-powered summaries (needs Azure OpenAI)
+- Vocabulary extraction (needs Azure OpenAI)
+
+### 📋 Post-MVP (Phase 5)
+- User management & authentication
+- Progress tracking
+- Flashcard review mode
 
 ---
 
