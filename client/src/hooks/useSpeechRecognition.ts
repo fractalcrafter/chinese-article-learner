@@ -61,13 +61,30 @@ export interface UseSpeechRecognitionReturn {
   resetTranscript: () => void;
 }
 
+// Helper: Add punctuation for Chinese text if it doesn't end with punctuation
+function addChinesePunctuation(text: string): string {
+  if (!text) return text;
+  const trimmed = text.trim();
+  // Chinese punctuation marks
+  const punctuation = ['。', '！', '？', '，', '、', '；', '：', '"', '"', "'", "'", '…', '—'];
+  const lastChar = trimmed[trimmed.length - 1];
+  
+  // If already ends with punctuation, return as-is
+  if (punctuation.includes(lastChar) || /[.!?,;:]$/.test(lastChar)) {
+    return text;
+  }
+  
+  // Add a Chinese period/comma for natural pauses
+  return text + '，';
+}
+
 export function useSpeechRecognition(
   options: UseSpeechRecognitionOptions = {}
 ): UseSpeechRecognitionReturn {
   const {
     language = 'zh-CN',
-    continuous = false,  // Changed: simpler mode for better Edge compatibility
-    interimResults = false,  // Changed: simpler mode for better Edge compatibility
+    continuous = true,  // Back to continuous for reliability
+    interimResults = true,  // Show interim results for better UX
   } = options;
 
   const [transcript, setTranscript] = useState('');
@@ -76,8 +93,18 @@ export function useSpeechRecognition(
   const [error, setError] = useState<string | null>(null);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const isListeningRef = useRef(false);  // Track listening state for callbacks
+  const shouldRestartRef = useRef(false);  // Track if we should auto-restart
+  const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   const isSupported = typeof window !== 'undefined' && 
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    isListeningRef.current = isListening;
+    shouldRestartRef.current = isListening;
+  }, [isListening]);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -111,18 +138,74 @@ export function useSpeechRecognition(
 
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
+      
+      // Don't show error for "no-speech" - just restart
+      if (event.error === 'no-speech') {
+        // Auto-restart after no speech detected
+        if (shouldRestartRef.current) {
+          restartTimeoutRef.current = setTimeout(() => {
+            if (shouldRestartRef.current && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) {
+                // Ignore
+              }
+            }
+          }, 100);
+        }
+        return;
+      }
+      
+      // For "aborted" error, just try to restart
+      if (event.error === 'aborted') {
+        if (shouldRestartRef.current) {
+          restartTimeoutRef.current = setTimeout(() => {
+            if (shouldRestartRef.current && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) {
+                // Ignore
+              }
+            }
+          }, 100);
+        }
+        return;
+      }
+      
       setError(event.error);
       setIsListening(false);
     };
 
     recognition.onend = () => {
-      // Auto-restart if still supposed to be listening (for continuous mode)
-      if (isListening && continuous) {
-        try {
-          recognition.start();
-        } catch (e) {
-          // Ignore - might already be started
-        }
+      // Clear interim transcript on end
+      setInterimTranscript('');
+      
+      // Auto-restart if still supposed to be listening
+      if (shouldRestartRef.current) {
+        // Add punctuation to mark the pause
+        setTranscript(prev => addChinesePunctuation(prev));
+        
+        // Restart after a brief delay
+        restartTimeoutRef.current = setTimeout(() => {
+          if (shouldRestartRef.current && recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch (e) {
+              console.warn('Failed to restart recognition:', e);
+              // If restart fails, try again after a longer delay
+              restartTimeoutRef.current = setTimeout(() => {
+                if (shouldRestartRef.current && recognitionRef.current) {
+                  try {
+                    recognitionRef.current.start();
+                  } catch (e2) {
+                    // Give up and mark as stopped
+                    setIsListening(false);
+                  }
+                }
+              }, 500);
+            }
+          }
+        }, 100);
       } else {
         setIsListening(false);
       }
@@ -135,18 +218,12 @@ export function useSpeechRecognition(
     recognitionRef.current = recognition;
 
     return () => {
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+      }
       recognition.abort();
     };
   }, [isSupported, language, continuous, interimResults]);
-
-  // Update listening state effect
-  useEffect(() => {
-    if (!recognitionRef.current) return;
-    
-    if (isListening) {
-      recognitionRef.current.continuous = continuous;
-    }
-  }, [isListening, continuous]);
 
   const startListening = useCallback(() => {
     if (!recognitionRef.current || !isSupported) {
@@ -154,22 +231,43 @@ export function useSpeechRecognition(
       return;
     }
 
+    // Clear any pending restart
+    if (restartTimeoutRef.current) {
+      clearTimeout(restartTimeoutRef.current);
+    }
+
     setError(null);
     setIsListening(true);
+    shouldRestartRef.current = true;
     
     try {
       recognitionRef.current.start();
     } catch (e) {
-      // Might already be started
-      console.warn('Recognition start error:', e);
+      // Might already be started, try stopping and restarting
+      try {
+        recognitionRef.current.stop();
+        setTimeout(() => {
+          if (recognitionRef.current && shouldRestartRef.current) {
+            recognitionRef.current.start();
+          }
+        }, 100);
+      } catch (e2) {
+        console.warn('Recognition start error:', e2);
+      }
     }
   }, [isSupported]);
 
   const stopListening = useCallback(() => {
-    if (!recognitionRef.current) return;
+    // Clear any pending restart
+    if (restartTimeoutRef.current) {
+      clearTimeout(restartTimeoutRef.current);
+    }
     
+    shouldRestartRef.current = false;
     setIsListening(false);
     setInterimTranscript('');
+    
+    if (!recognitionRef.current) return;
     
     try {
       recognitionRef.current.stop();
