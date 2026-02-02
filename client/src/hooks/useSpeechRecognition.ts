@@ -66,8 +66,8 @@ export function useSpeechRecognition(
 ): UseSpeechRecognitionReturn {
   const {
     language = 'zh-CN',
-    continuous = true,
-    interimResults = true,
+    continuous = false,  // Changed: simpler mode for better Edge compatibility
+    interimResults = false,  // Changed: simpler mode for better Edge compatibility
   } = options;
 
   const [transcript, setTranscript] = useState('');
