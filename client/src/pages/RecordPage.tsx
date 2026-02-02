@@ -52,7 +52,8 @@ export function RecordPage() {
     if (!confirm('Delete this article?')) return;
     try {
       await deleteArticle(id);
-      setArticles(articles.filter(a => a.id !== id));
+      // Use functional update to avoid stale closure
+      setArticles(prev => prev.filter(a => a.id !== id));
     } catch (err) {
       console.error('Failed to delete:', err);
       alert('Failed to delete article');

@@ -295,22 +295,22 @@ function SentenceCard({
   onSpeak: (text: string) => void;
 }) {
   // Parse pinyin and match with Chinese characters
-  // Pinyin is typically space-separated, one per character/word
+  // Pinyin is generated only for Chinese characters (server-side)
   const renderChineseWithPinyin = () => {
-    const chars = sentence.chinese.split('');
-    const pinyinParts = sentence.pinyin.split(/\s+/);
+    // Use spread to handle surrogate pairs (CJK Extension B) correctly
+    const chars = [...sentence.chinese];
+    const pinyinParts = sentence.pinyin.split(/\s+/);  // Keep placeholders for alignment
     
-    // Try to match pinyin to characters
-    // Handle case where pinyin count doesn't match character count
-    let pinyinIndex = 0;
-    
-    // Helper to check if character is Chinese (CJK range)
+    // Helper to check if character is Chinese (CJK range) - uses codePointAt for surrogate pairs
     const isChineseChar = (char: string) => {
-      const code = char.charCodeAt(0);
+      const code = char.codePointAt(0) || 0;
       return (code >= 0x4E00 && code <= 0x9FFF) ||  // CJK Unified Ideographs
              (code >= 0x3400 && code <= 0x4DBF) ||  // CJK Extension A
              (code >= 0x20000 && code <= 0x2A6DF);  // CJK Extension B
     };
+    
+    // Pinyin index - only incremented for Chinese characters
+    let pinyinIndex = 0;
     
     return chars.map((char, index) => {
       // Check if it's a Chinese character (only Chinese chars get pinyin)
@@ -318,11 +318,14 @@ function SentenceCard({
         const pinyin = pinyinParts[pinyinIndex] || '';
         pinyinIndex++;
         
+        // Skip placeholder pinyins (underscore means no pinyin available)
+        const displayPinyin = pinyin === '_' ? '' : pinyin;
+        
         return (
           <ruby key={index} className="mr-1">
             <span className="text-2xl">{char}</span>
             <rp>(</rp>
-            <rt className="text-sm text-amber-600 font-normal">{pinyin}</rt>
+            <rt className="text-sm text-amber-600 font-normal">{displayPinyin}</rt>
             <rp>)</rp>
           </ruby>
         );
@@ -335,6 +338,14 @@ function SentenceCard({
         </span>
       );
     });
+  };
+  
+  // Handle speak with proper Chinese text
+  const handleSpeak = () => {
+    const text = sentence.chinese;
+    console.log('Speaking Chinese text:', text);
+    console.log('Text char codes:', [...text].map(c => c.charCodeAt(0).toString(16)));
+    onSpeak(text);
   };
 
   return (
@@ -357,7 +368,7 @@ function SentenceCard({
 
         {/* Speak Button */}
         <button
-          onClick={() => onSpeak(sentence.chinese)}
+          onClick={handleSpeak}
           className="p-3 bg-amber-100 hover:bg-amber-200 rounded-full transition-colors flex-shrink-0"
           title="Listen to pronunciation"
         >

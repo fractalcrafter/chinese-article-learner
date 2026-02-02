@@ -65,20 +65,51 @@ export async function processSentences(chineseText) {
     }
     // Process each sentence
     const results = [];
+    // Helper to check if character is Chinese (CJK range) - uses codePointAt for surrogate pairs
+    const isChineseChar = (char) => {
+        const code = char.codePointAt(0) || 0;
+        return (code >= 0x4E00 && code <= 0x9FFF) || // CJK Unified Ideographs
+            (code >= 0x3400 && code <= 0x4DBF) || // CJK Extension A
+            (code >= 0x20000 && code <= 0x2A6DF); // CJK Extension B
+    };
     for (const sentence of sentences) {
-        // Generate pinyin
-        let pinyinStr = '';
+        // Generate pinyin with context awareness for polyphones
+        // First get all pinyin for the sentence with segmentation
+        let allPinyin = [];
         try {
-            const pinyinResult = pinyinFn(sentence, {
+            allPinyin = pinyinFn(sentence, {
                 style: STYLE_TONE,
-                segment: true
+                segment: true // Keep context for polyphone disambiguation
             });
-            pinyinStr = pinyinResult.map((p) => p[0]).join(' ');
         }
         catch (e) {
             console.error('Pinyin generation error:', e);
-            pinyinStr = '(pinyin unavailable)';
         }
+        // Now filter to only keep pinyin for actual Chinese characters
+        // Iterate by codepoints to handle surrogate pairs correctly
+        const chars = [...sentence]; // Spread handles surrogate pairs correctly
+        const pinyinParts = [];
+        let pinyinIdx = 0;
+        for (const char of chars) {
+            if (isChineseChar(char)) {
+                // Get the pinyin for this character position
+                const py = allPinyin[pinyinIdx]?.[0] || '';
+                pinyinParts.push(py || '_'); // Use placeholder if empty to maintain alignment
+                pinyinIdx++;
+            }
+            else {
+                // Non-Chinese chars may or may not have pinyin entries depending on library
+                // Check if there's a pinyin entry and skip it if so
+                if (pinyinIdx < allPinyin.length) {
+                    const entry = allPinyin[pinyinIdx]?.[0] || '';
+                    // If it looks like pinyin for a number/letter, skip it
+                    if (entry && !isChineseChar(char)) {
+                        pinyinIdx++;
+                    }
+                }
+            }
+        }
+        const pinyinStr = pinyinParts.join(' ');
         // Translate to English
         let englishTranslation = '';
         try {

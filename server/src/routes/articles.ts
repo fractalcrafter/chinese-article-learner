@@ -49,7 +49,12 @@ router.get('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    db.prepare('DELETE FROM articles WHERE id = ?').run(id);
+    const result = db.prepare('DELETE FROM articles WHERE id = ?').run(id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Article not found' });
+    }
+    
     res.json({ message: 'Article deleted successfully' });
   } catch (error) {
     console.error('Error deleting article:', error);

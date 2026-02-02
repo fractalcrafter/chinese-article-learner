@@ -5,6 +5,7 @@ export interface UseSpeechSynthesisReturn {
   stop: () => void;
   isSupported: boolean;
   voicesLoaded: boolean;
+  hasChineseVoice: boolean;
 }
 
 export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
@@ -16,6 +17,7 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
   // Cache voices when they become available
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voicesLoaded, setVoicesLoaded] = useState(false);
+  const [hasChineseVoice, setHasChineseVoice] = useState(false);
   
   // Load voices - they load asynchronously in most browsers
   useEffect(() => {
@@ -26,10 +28,17 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
       if (availableVoices.length > 0) {
         setVoices(availableVoices);
         setVoicesLoaded(true);
-        console.log('Loaded', availableVoices.length, 'voices');
-        // Log Chinese voices specifically
+        
+        // Check for Chinese voices
         const chineseVoices = availableVoices.filter(v => v.lang.startsWith('zh'));
+        setHasChineseVoice(chineseVoices.length > 0);
+        
+        console.log('Loaded', availableVoices.length, 'voices');
         console.log('Chinese voices:', chineseVoices.map(v => `${v.name} (${v.lang})`));
+        
+        if (chineseVoices.length === 0) {
+          console.warn('No Chinese voice available! Install Chinese language pack in Windows Settings > Language.');
+        }
       }
     };
     
@@ -55,7 +64,7 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
       return;
     }
 
-    console.log('Speaking text:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
+    console.log('TTS speak() called with:', JSON.stringify(text));
 
     // Cancel any ongoing speech
     window.speechSynthesis.cancel();
@@ -67,36 +76,32 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
     utterance.volume = 1;
 
     // Find a Chinese voice - MUST set voice for Chinese to work properly
-    // Priority: zh-CN > zh-TW > any zh voice
-    let selectedVoice: SpeechSynthesisVoice | undefined;
+    // Get fresh voices list each time (in case they loaded after component mounted)
+    const currentVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
     
-    if (voices.length > 0) {
-      selectedVoice = voices.find(voice => voice.lang === 'zh-CN') ||
-                      voices.find(voice => voice.lang === 'zh-TW') ||
-                      voices.find(voice => voice.lang.startsWith('zh-CN')) ||
-                      voices.find(voice => voice.lang.startsWith('zh'));
-    } else {
-      // Try getting voices again directly (fallback)
-      const currentVoices = window.speechSynthesis.getVoices();
-      selectedVoice = currentVoices.find(voice => voice.lang === 'zh-CN') ||
-                      currentVoices.find(voice => voice.lang === 'zh-TW') ||
-                      currentVoices.find(voice => voice.lang.startsWith('zh'));
-    }
+    // Priority: Microsoft Chinese voices (best quality) > other zh-CN > zh-TW > any zh
+    let selectedVoice = currentVoices.find(v => v.lang === 'zh-CN' && v.name.includes('Microsoft')) ||
+                        currentVoices.find(v => v.lang === 'zh-CN') ||
+                        currentVoices.find(v => v.lang === 'zh-TW') ||
+                        currentVoices.find(v => v.lang.startsWith('zh'));
     
     if (selectedVoice) {
       console.log('Using Chinese voice:', selectedVoice.name, selectedVoice.lang);
       utterance.voice = selectedVoice;
     } else {
-      console.warn('No Chinese voice found! Text may be read incorrectly.');
-      console.warn('Available voices:', voices.map(v => v.lang).join(', '));
+      console.warn('No Chinese voice found! Speech may be incorrect.');
+      console.warn('Available voices:', currentVoices.map(v => `${v.name}(${v.lang})`).join(', '));
+      // Still try to speak - lang setting might help on some systems
     }
 
     // Store in ref to prevent garbage collection
     utteranceRef.current = utterance;
 
-    // Add error handler
+    // Add handlers for debugging
+    utterance.onstart = () => console.log('TTS started');
+    utterance.onend = () => console.log('TTS ended');
     utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
+      console.error('TTS error:', event.error);
     };
 
     window.speechSynthesis.speak(utterance);
@@ -112,5 +117,6 @@ export function useSpeechSynthesis(): UseSpeechSynthesisReturn {
     stop,
     isSupported,
     voicesLoaded,
+    hasChineseVoice,
   };
 }
