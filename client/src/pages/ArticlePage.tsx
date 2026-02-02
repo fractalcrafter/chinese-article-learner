@@ -64,6 +64,7 @@ export function ArticlePage() {
   };
 
   const handleSpeak = (text: string) => {
+    console.log('handleSpeak called with:', text);
     speak(text, 'zh-CN');
   };
 
@@ -320,7 +321,7 @@ function SentenceCard({
       pinyinIndex++;
       
       return (
-        <ruby key={index}>
+        <ruby key={index} className="mr-1">
           <span className="text-2xl">{char}</span>
           <rp>(</rp>
           <rt className="text-sm text-amber-600 font-normal">{pinyin}</rt>

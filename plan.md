@@ -110,9 +110,9 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 - [x] Add emoji/icon selection for visual learning
 
 ### Phase 5: User Management & Progress (Post-MVP)
-- [ ] Implement simple user authentication (password-based)
-- [ ] Create user profiles database schema
-- [ ] Build user selection/login UI
+- [x] Implement simple user authentication (password-based)
+- [x] Create user profiles database schema
+- [x] Build user selection/login UI
 - [ ] Track article completion per user
 - [ ] Track vocabulary mastery per user
 - [ ] Add progress dashboard
