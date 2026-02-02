@@ -51,6 +51,13 @@ export async function getArticles(): Promise<Article[]> {
   return response.json();
 }
 
+export async function deleteArticle(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/articles/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete article');
+}
+
 export async function updateTranscription(id: number, transcription: string): Promise<void> {
   const response = await fetch(`${API_BASE}/articles/${id}/transcription`, {
     method: 'PUT',

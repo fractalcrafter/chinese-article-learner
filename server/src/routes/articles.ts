@@ -45,6 +45,18 @@ router.get('/:id', (req, res) => {
   }
 });
 
+// Delete an article
+router.delete('/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    db.prepare('DELETE FROM articles WHERE id = ?').run(id);
+    res.json({ message: 'Article deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting article:', error);
+    res.status(500).json({ error: 'Failed to delete article' });
+  }
+});
+
 // Create new article from transcription
 router.post('/', async (req, res) => {
   try {

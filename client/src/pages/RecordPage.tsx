@@ -1,9 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Save, Loader2, AlertCircle, LogOut } from 'lucide-react';
+import { Mic, MicOff, Save, Loader2, AlertCircle, LogOut, Trash2, BookOpen } from 'lucide-react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
-import { createArticle } from '../lib/api';
+import { createArticle, getArticles, deleteArticle } from '../lib/api';
 import { useUser } from '../contexts/UserContext';
+
+type ArticleListItem = {
+  id: number;
+  title: string;
+  created_at: string;
+};
 
 export function RecordPage() {
   const navigate = useNavigate();
@@ -11,6 +17,8 @@ export function RecordPage() {
   const [editedText, setEditedText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [title, setTitle] = useState('');
+  const [articles, setArticles] = useState<ArticleListItem[]>([]);
+  const [loadingArticles, setLoadingArticles] = useState(true);
 
   const {
     transcript,
@@ -22,6 +30,34 @@ export function RecordPage() {
     stopListening,
     resetTranscript,
   } = useSpeechRecognition({ language: 'zh-CN' });
+
+  // Load articles on mount
+  useEffect(() => {
+    loadArticles();
+  }, []);
+
+  const loadArticles = async () => {
+    try {
+      const data = await getArticles();
+      setArticles(data as ArticleListItem[]);
+    } catch (err) {
+      console.error('Failed to load articles:', err);
+    } finally {
+      setLoadingArticles(false);
+    }
+  };
+
+  const handleDeleteArticle = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Delete this article?')) return;
+    try {
+      await deleteArticle(id);
+      setArticles(articles.filter(a => a.id !== id));
+    } catch (err) {
+      console.error('Failed to delete:', err);
+      alert('Failed to delete article');
+    }
+  };
 
   // Combine transcript with edited text
   const displayText = editedText || transcript;
@@ -232,6 +268,51 @@ Click 'Start Recording' and speak in Chinese, or type/paste text directly."
             <li>• You can also paste Chinese text directly</li>
             <li>• Works best in Chrome or Edge browsers</li>
           </ul>
+        </div>
+
+        {/* Previous Articles */}
+        <div className="mt-8 bg-white rounded-2xl shadow-lg p-6">
+          <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-amber-600" />
+            Previous Articles
+          </h3>
+          
+          {loadingArticles ? (
+            <div className="text-center py-4 text-gray-500">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+              Loading...
+            </div>
+          ) : articles.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">
+              No articles yet. Record or paste your first Chinese article above!
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {articles.map((article) => (
+                <div
+                  key={article.id}
+                  onClick={() => navigate(`/article/${article.id}`)}
+                  className="flex items-center justify-between p-3 bg-amber-50 hover:bg-amber-100 rounded-xl cursor-pointer transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-800 truncate">
+                      {article.title || 'Untitled Article'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(article.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteArticle(article.id, e)}
+                    className="p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                    title="Delete article"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

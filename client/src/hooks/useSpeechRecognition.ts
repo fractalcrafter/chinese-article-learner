@@ -62,20 +62,23 @@ export interface UseSpeechRecognitionReturn {
 }
 
 // Helper: Add punctuation for Chinese text if it doesn't end with punctuation
-function addChinesePunctuation(text: string): string {
+function addChinesePunctuation(text: string, isFinalStop = false): string {
   if (!text) return text;
   const trimmed = text.trim();
+  if (!trimmed) return text;
+  
   // Chinese punctuation marks
-  const punctuation = ['。', '！', '？', '，', '、', '；', '：', '"', '"', "'", "'", '…', '—'];
+  const endPunctuation = ['。', '！', '？', '；'];
+  const allPunctuation = [...endPunctuation, '，', '、', '：', '"', '"', "'", "'", '…', '—'];
   const lastChar = trimmed[trimmed.length - 1];
   
   // If already ends with punctuation, return as-is
-  if (punctuation.includes(lastChar) || /[.!?,;:]$/.test(lastChar)) {
+  if (allPunctuation.includes(lastChar) || /[.!?,;:]$/.test(lastChar)) {
     return text;
   }
   
-  // Add a Chinese period/comma for natural pauses
-  return text + '，';
+  // Add period if it's a final stop, otherwise comma for natural pauses
+  return text + (isFinalStop ? '。' : '，');
 }
 
 export function useSpeechRecognition(
@@ -266,6 +269,9 @@ export function useSpeechRecognition(
     shouldRestartRef.current = false;
     setIsListening(false);
     setInterimTranscript('');
+    
+    // Add final period when user manually stops
+    setTranscript(prev => addChinesePunctuation(prev, true));
     
     if (!recognitionRef.current) return;
     

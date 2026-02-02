@@ -60,17 +60,31 @@ Respond with only the summary in English, no additional formatting.`;
  * Split Chinese text into sentences and generate translations
  */
 export async function processSentences(chineseText: string): Promise<Sentence[]> {
-  // Split by Chinese punctuation marks
-  const sentenceDelimiters = /([。！？；])/;
+  // Split by Chinese punctuation marks (including comma for natural phrases)
+  // Primary sentence endings: 。！？
+  // Secondary breaks: ；，(semicolon, comma for longer texts)
+  const sentenceDelimiters = /([。！？])/;
   const parts = chineseText.split(sentenceDelimiters);
   
   // Recombine sentences with their punctuation
-  const sentences: string[] = [];
+  let sentences: string[] = [];
   for (let i = 0; i < parts.length; i += 2) {
     const text = parts[i]?.trim();
     const punct = parts[i + 1] || '';
     if (text) {
       sentences.push(text + punct);
+    }
+  }
+  
+  // If no sentences found (no proper punctuation), try splitting by commas or just use whole text
+  if (sentences.length === 0 && chineseText.trim()) {
+    // Try splitting by commas or semicolons for texts without periods
+    const commaParts = chineseText.split(/[，；]/);
+    if (commaParts.length > 1) {
+      sentences = commaParts.map(s => s.trim()).filter(s => s.length > 0);
+    } else {
+      // No punctuation at all - treat entire text as one sentence
+      sentences = [chineseText.trim()];
     }
   }
 
