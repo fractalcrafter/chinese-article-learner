@@ -153,12 +153,12 @@ export async function extractVocabulary(chineseText: string): Promise<Vocabulary
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
-    const prompt = `You are helping an 8th grader learn Chinese vocabulary. From this Chinese article, identify 5-8 key vocabulary words that would be most useful for a student to learn.
+    const prompt = `You are helping an 8th grader learn Chinese vocabulary. From this Chinese article, identify 5-8 key vocabulary words/phrases (commonly 2-character phrases) that would be most useful for a student to learn.
 
 For each word, provide:
-1. The Chinese word/character
-2. Pinyin with tone marks
-3. English meaning
+1. The Chinese word/phrase (commonly 2 characters, e.g., 上映, 领域)
+2. Pinyin with tone marks (e.g., shàngyìng)
+3. English meaning in dictionary style - list common meanings separated by " / " (e.g., "to show (a movie) / to screen")
 4. A simple example sentence in Chinese
 5. A relevant emoji that helps visualize or remember the word
 
@@ -168,11 +168,11 @@ ${chineseText}
 Respond in JSON format only, no markdown:
 [
   {
-    "chinese": "学习",
-    "pinyin": "xué xí",
-    "english": "to study/learn",
-    "example": "我每天学习中文。",
-    "emoji": "📚"
+    "chinese": "上映",
+    "pinyin": "shàngyìng",
+    "english": "to show (a movie) / to screen",
+    "example": "这部电影下周上映。",
+    "emoji": "🎬"
   }
 ]`;
 
@@ -205,9 +205,32 @@ export function getPinyin(chinese: string): string {
 }
 
 /**
- * Translate a single word or phrase
+ * Translate a single word or phrase using Gemini for dictionary-quality results
+ * Falls back to google-translate if Gemini is unavailable
  */
 export async function translateText(text: string, from = 'zh-CN', to = 'en'): Promise<string> {
+  // Use Gemini only for Chinese→English (dictionary-quality translations)
+  if (process.env.GEMINI_API_KEY && from.startsWith('zh') && to === 'en') {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const prompt = `Translate this Chinese word/phrase to English in dictionary style. Give the most common meanings separated by " / ". Be concise like a dictionary entry. Do NOT include the Chinese characters, pinyin, or any extra explanation.
+
+Chinese: ${text}
+
+Example format: to show (a movie) / to screen
+Example format: domain / sphere / field / territory / area
+
+Respond with ONLY the English translation, nothing else.`;
+      
+      const result = await model.generateContent(prompt);
+      const translation = result.response.text().trim();
+      if (translation) return translation;
+    } catch (e) {
+      console.error('Gemini translation failed, falling back to google-translate:', e);
+    }
+  }
+
+  // Fallback to google-translate (also used for non-English targets)
   try {
     const result = await translate(text, { from, to });
     return result.text;

@@ -9,66 +9,98 @@ interface VocabularyCardProps {
 }
 
 export function VocabularyCard({ vocabulary, onSpeak }: VocabularyCardProps) {
-  const strokeRef = useRef<HTMLDivElement>(null);
+  // One ref per character container, and one HanziWriter per character
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const writerRef = useRef<HanziWriter | null>(null);
+  const writersRef = useRef<HanziWriter[]>([]);
+
+  // Extract individual Chinese characters (filter out non-CJK)
+  const chars = [...vocabulary.chinese].filter(ch => {
+    const code = ch.codePointAt(0) || 0;
+    return (code >= 0x4E00 && code <= 0x9FFF) ||
+           (code >= 0x3400 && code <= 0x4DBF) ||
+           (code >= 0x20000 && code <= 0x2A6DF);
+  });
 
   useEffect(() => {
-    if (!strokeRef.current || !vocabulary.chinese) return;
+    if (!containerRef.current || chars.length === 0) return;
 
-    // Clear previous writer
-    strokeRef.current.innerHTML = '';
+    // Clean up previous writers before creating new ones
+    writersRef.current.forEach(w => {
+      try { w.hideCharacter(); } catch (_) { /* ignore */ }
+    });
+    containerRef.current.innerHTML = '';
+    writersRef.current = [];
 
-    // Get the first character for stroke animation
-    const firstChar = vocabulary.chinese[0];
-    
-    try {
-      const writer = HanziWriter.create(strokeRef.current, firstChar, {
-        width: 120,
-        height: 120,
-        padding: 5,
-        strokeColor: '#d97706', // amber-600
-        radicalColor: '#92400e', // amber-800
-        strokeAnimationSpeed: 1,
-        delayBetweenStrokes: 200,
-        showOutline: true,
-        showCharacter: true,
-      });
-      
-      writerRef.current = writer;
-    } catch (e) {
-      console.warn('Could not create HanziWriter for:', firstChar);
+    // Determine size based on character count (smaller for more chars)
+    const size = chars.length <= 2 ? 100 : chars.length <= 3 ? 80 : 60;
+
+    for (const char of chars) {
+      const charDiv = document.createElement('div');
+      charDiv.style.width = `${size}px`;
+      charDiv.style.height = `${size}px`;
+      charDiv.style.display = 'inline-block';
+      containerRef.current.appendChild(charDiv);
+
+      try {
+        const writer = HanziWriter.create(charDiv, char, {
+          width: size,
+          height: size,
+          padding: 3,
+          strokeColor: '#d97706',
+          radicalColor: '#92400e',
+          strokeAnimationSpeed: 1,
+          delayBetweenStrokes: 200,
+          showOutline: true,
+          showCharacter: true,
+        });
+        writersRef.current.push(writer);
+      } catch (e) {
+        console.warn('Could not create HanziWriter for:', char);
+      }
     }
 
     return () => {
-      writerRef.current = null;
+      writersRef.current.forEach(w => {
+        try { w.hideCharacter(); } catch (_) { /* ignore */ }
+      });
+      writersRef.current = [];
     };
   }, [vocabulary.chinese]);
 
+  // Animate all characters sequentially, capturing writers array to avoid stale refs
   const handleAnimate = () => {
-    if (writerRef.current && !isAnimating) {
-      setIsAnimating(true);
-      writerRef.current.animateCharacter({
-        onComplete: () => setIsAnimating(false),
+    const writers = writersRef.current;
+    if (writers.length === 0 || isAnimating) return;
+    setIsAnimating(true);
+
+    let i = 0;
+    const animateNext = () => {
+      // Check writers still match current ref (vocab didn't change mid-animation)
+      if (i >= writers.length || writers !== writersRef.current) {
+        setIsAnimating(false);
+        return;
+      }
+      writers[i].animateCharacter({
+        onComplete: () => {
+          i++;
+          animateNext();
+        },
       });
-    }
+    };
+    animateNext();
   };
 
   return (
     <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
       <div className="flex gap-4">
-        {/* Stroke Animation */}
+        {/* Stroke Animation - shows all characters side by side */}
         <div 
-          className="flex-shrink-0 cursor-pointer hover:bg-amber-50 rounded-lg transition-colors"
+          className="flex-shrink-0 cursor-pointer hover:bg-amber-50 rounded-lg transition-colors p-1"
           onClick={handleAnimate}
           title="Click to see stroke order"
         >
-          <div ref={strokeRef} className="w-[120px] h-[120px]" />
-          {vocabulary.chinese.length > 1 && (
-            <p className="text-xs text-center text-gray-400 mt-1">
-              +{vocabulary.chinese.length - 1} more
-            </p>
-          )}
+          <div ref={containerRef} className="flex" />
         </div>
 
         {/* Info */}
