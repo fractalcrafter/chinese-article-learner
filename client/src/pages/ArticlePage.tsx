@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Volume2, Loader2, BookOpen, GraduationCap, Plus, X, Trash2 } from 'lucide-react';
-import { getArticle, processArticle, addVocabulary, deleteVocabulary, deleteArticle } from '../lib/api';
+import { ArrowLeft, Volume2, Loader2, BookOpen, GraduationCap, Plus, X, Trash2, Pencil, Save, RotateCcw } from 'lucide-react';
+import { getArticle, processArticle, addVocabulary, deleteVocabulary, deleteArticle, updateTranscription } from '../lib/api';
 import type { Article, Sentence } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 import { VocabularyCard } from '../components/VocabularyCard';
@@ -18,6 +18,10 @@ export function ArticlePage() {
   const [activeTab, setActiveTab] = useState<'article' | 'vocabulary'>('article');
   const [newVocab, setNewVocab] = useState('');
   const [isAddingVocab, setIsAddingVocab] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedText, setEditedText] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [needsReprocessing, setNeedsReprocessing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -114,6 +118,38 @@ export function ArticlePage() {
     }
   };
 
+  // Start editing: populate textarea with current transcription
+  const handleStartEditing = () => {
+    const currentText = article?.transcription_edited || article?.transcription_original || '';
+    setEditedText(currentText);
+    setIsEditing(true);
+  };
+
+  // Save edited text, then optionally re-process
+  const handleSaveEdit = async (reprocess = false) => {
+    if (!id || !editedText.trim()) return;
+
+    setIsSavingEdit(true);
+    try {
+      await updateTranscription(parseInt(id), editedText);
+      // Update local state with the edited text
+      setArticle(prev => prev ? { ...prev, transcription_edited: editedText } : null);
+      setIsEditing(false);
+
+      if (reprocess) {
+        await handleProcess();
+        setNeedsReprocessing(false);
+      } else {
+        setNeedsReprocessing(true);
+      }
+    } catch (err) {
+      console.error('Failed to save edit:', err);
+      alert('Failed to save edits');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50 flex items-center justify-center">
@@ -202,6 +238,76 @@ export function ArticlePage() {
         {/* Article Tab */}
         {activeTab === 'article' && (
           <div className="space-y-6">
+            {/* Edit Toggle Button */}
+            {article.sentences && article.sentences.length > 0 && !isEditing && (
+              <div className="flex justify-end">
+                <button
+                  onClick={handleStartEditing}
+                  className="flex items-center gap-2 px-4 py-2 text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit Article Text
+                </button>
+              </div>
+            )}
+
+            {/* Re-processing needed banner */}
+            {needsReprocessing && !isEditing && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between">
+                <p className="text-yellow-800 text-sm">
+                  ⚠️ Text was updated. Re-process to refresh the sentence breakdown.
+                </p>
+                <button
+                  onClick={() => { handleProcess(); setNeedsReprocessing(false); }}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-3 py-1 text-white bg-amber-500 hover:bg-amber-600 rounded-lg text-sm transition-colors disabled:opacity-50"
+                >
+                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                  Re-process
+                </button>
+              </div>
+            )}
+
+            {/* Editing Panel */}
+            {isEditing && (
+              <div className="bg-white rounded-xl shadow-md p-6">
+                <h2 className="text-lg font-semibold text-amber-800 mb-3">✏️ Edit Article Text</h2>
+                <textarea
+                  value={editedText}
+                  onChange={(e) => setEditedText(e.target.value)}
+                  className="w-full h-48 p-4 text-xl leading-relaxed border-2 border-amber-200 rounded-xl focus:border-amber-400 focus:outline-none resize-none"
+                  style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                />
+                <div className="flex justify-between items-center mt-3">
+                  <span className="text-sm text-gray-500">{editedText.length} characters</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      disabled={isSavingEdit}
+                      className="px-4 py-2 text-gray-600 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleSaveEdit(false)}
+                      disabled={isSavingEdit || !editedText.trim()}
+                      className="flex items-center gap-2 px-4 py-2 text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isSavingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Save Only
+                    </button>
+                    <button
+                      onClick={() => handleSaveEdit(true)}
+                      disabled={isSavingEdit || !editedText.trim()}
+                      className="flex items-center gap-2 px-4 py-2 text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isSavingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                      Save & Re-process
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Summary */}
             {article.summary && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
