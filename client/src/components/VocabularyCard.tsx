@@ -107,19 +107,6 @@ export function VocabularyCard({ vocabulary, onSpeak }: VocabularyCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div>
-              {/* Emoji & Chinese */}
-              <div className="flex items-center gap-2 mb-1">
-                {vocabulary.emoji && (
-                  <span className="text-2xl">{vocabulary.emoji}</span>
-                )}
-                <span 
-                  className="text-2xl font-bold text-gray-900"
-                  style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
-                >
-                  {vocabulary.chinese}
-                </span>
-              </div>
-
               {/* Pinyin */}
               <p className="text-amber-600 font-medium mb-1">
                 {vocabulary.pinyin}
