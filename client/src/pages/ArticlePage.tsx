@@ -40,8 +40,11 @@ export function ArticlePage() {
       // Auto-process if not yet processed or has old failed summary
       const hasBadSummary = data.summary && 
         (data.summary.includes('not available') || data.summary.includes('unavailable'));
-      if ((!data.summary && !data.sentences?.length) || hasBadSummary) {
+      if (!data.summary && !data.sentences?.length) {
         await handleProcess();
+      } else if (hasBadSummary) {
+        // Reprocess in background — don't block page load
+        handleProcess();
       }
     } catch (err) {
       console.error('Failed to load article:', err);
