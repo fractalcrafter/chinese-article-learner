@@ -61,6 +61,9 @@ export interface UseSpeechRecognitionReturn {
   resetTranscript: () => void;
 }
 
+// Module-level constant to avoid unnecessary hook recreation
+const MAX_RESTART_ATTEMPTS = 10;
+
 // Helper: Add punctuation for Chinese text if it doesn't end with punctuation
 function addChinesePunctuation(text: string, isFinalStop = false): string {
   if (!text) return text;
@@ -99,25 +102,59 @@ export function useSpeechRecognition(
   const isListeningRef = useRef(false);  // Track listening state for callbacks
   const shouldRestartRef = useRef(false);  // Track if we should auto-restart
   const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restartAttemptsRef = useRef(0);  // Track restart attempts to prevent infinite loops
+  const pendingRestartDelayRef = useRef<number | null>(null);  // Track pending restart delay to prevent onend override
+  const isMountedRef = useRef(true);  // Track mount state to prevent state updates after unmount
   
   const isSupported = typeof window !== 'undefined' && 
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
 
-  // Helper to safely schedule restart, clearing any existing timeout first
-  const scheduleRestart = (delay: number, onFail?: () => void) => {
+  // Helper to safely restart recognition with retry logic
+  const attemptRestart = useCallback((delayMs: number = 100, force: boolean = false) => {
+    // Don't override a longer pending delay unless forced (e.g., network backoff)
+    if (!force && pendingRestartDelayRef.current !== null && pendingRestartDelayRef.current > delayMs) {
+      return;
+    }
+    
     if (restartTimeoutRef.current) {
       clearTimeout(restartTimeoutRef.current);
     }
+    
+    if (!shouldRestartRef.current || !recognitionRef.current) {
+      pendingRestartDelayRef.current = null;
+      return;
+    }
+    
+    if (restartAttemptsRef.current >= MAX_RESTART_ATTEMPTS) {
+      console.warn('Max restart attempts reached, stopping');
+      pendingRestartDelayRef.current = null;
+      if (isMountedRef.current) {
+        setError('Speech recognition stopped. Click "Start Recording" to continue.');
+        setIsListening(false);
+      }
+      shouldRestartRef.current = false;
+      return;
+    }
+    
+    pendingRestartDelayRef.current = delayMs;
+    
     restartTimeoutRef.current = setTimeout(() => {
+      pendingRestartDelayRef.current = null;
       if (!shouldRestartRef.current || !recognitionRef.current) return;
+      
       try {
         recognitionRef.current.start();
+        // Only increment after start() doesn't throw synchronously
+        restartAttemptsRef.current++;
       } catch (e) {
-        console.warn('Restart failed:', e);
-        if (onFail) onFail();
+        restartAttemptsRef.current++;
+        console.warn('Restart attempt failed:', e, `(attempt ${restartAttemptsRef.current})`);
+        // Exponential backoff: 100ms, 200ms, 400ms, 800ms...
+        const nextDelay = Math.min(delayMs * 2, 2000);
+        attemptRestart(nextDelay, true);
       }
-    }, delay);
-  };
+    }, delayMs);
+  }, []);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -158,15 +195,10 @@ export function useSpeechRecognition(
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
       
-      // Don't show error for "no-speech" - just restart
+      // Don't show error for "no-speech" - just silently restart
       if (event.error === 'no-speech') {
         if (shouldRestartRef.current) {
-          scheduleRestart(300, () => {
-            scheduleRestart(1000, () => {
-              setError('Speech stopped. Click to restart.');
-              setIsListening(false);
-            });
-          });
+          attemptRestart(100);
         }
         return;
       }
@@ -174,64 +206,68 @@ export function useSpeechRecognition(
       // For "aborted" error, just try to restart
       if (event.error === 'aborted') {
         if (shouldRestartRef.current) {
-          scheduleRestart(300);
+          attemptRestart(100);
         }
         return;
       }
       
-      // Network errors are common - allow retry
+      // Network errors are common - allow retry with longer delay (force to override any pending restart)
       if (event.error === 'network') {
         if (shouldRestartRef.current) {
-          setError('Network issue - retrying...');
-          scheduleRestart(2000, () => {
-            setError('network');
-            setIsListening(false);
-          });
+          if (isMountedRef.current) {
+            setError('Network issue - retrying...');
+          }
+          attemptRestart(1000, true);  // Force to ensure network backoff isn't overridden
         }
         return;
       }
       
-      setError(event.error);
-      setIsListening(false);
+      if (isMountedRef.current) {
+        setError(event.error);
+        setIsListening(false);
+      }
     };
 
     recognition.onend = () => {
       // Clear interim transcript on end
-      setInterimTranscript('');
+      if (isMountedRef.current) {
+        setInterimTranscript('');
+      }
       
       // Auto-restart if still supposed to be listening
       if (shouldRestartRef.current) {
         // Add punctuation to mark the pause
-        setTranscript(prev => addChinesePunctuation(prev));
+        if (isMountedRef.current) {
+          setTranscript(prev => addChinesePunctuation(prev));
+        }
         
-        // Restart with exponential backoff on failure
-        scheduleRestart(300, () => {
-          scheduleRestart(1000, () => {
-            scheduleRestart(2000, () => {
-              setError('Speech stopped. Click "Start Recording" to continue.');
-              setIsListening(false);
-            });
-          });
-        });
-      } else {
+        // Restart quickly to minimize gap (but don't override longer pending delays like network backoff)
+        attemptRestart(100);
+      } else if (isMountedRef.current) {
         setIsListening(false);
       }
     };
 
     recognition.onstart = () => {
-      setError(null);
+      if (isMountedRef.current) {
+        setError(null);
+      }
+      pendingRestartDelayRef.current = null;
+      restartAttemptsRef.current = 0;  // Reset counter on successful start
     };
 
     recognitionRef.current = recognition;
 
     return () => {
+      isMountedRef.current = false;  // Mark as unmounted to prevent state updates
       shouldRestartRef.current = false;  // Prevent post-unmount restarts
+      pendingRestartDelayRef.current = null;
       if (restartTimeoutRef.current) {
         clearTimeout(restartTimeoutRef.current);
       }
       recognition.abort();
     };
-  }, [isSupported, language, continuous, interimResults]);
+  }, [isSupported, language, continuous, interimResults, attemptRestart]);
 
   const startListening = useCallback(() => {
     if (!recognitionRef.current || !isSupported) {
@@ -243,33 +279,33 @@ export function useSpeechRecognition(
     if (restartTimeoutRef.current) {
       clearTimeout(restartTimeoutRef.current);
     }
+    pendingRestartDelayRef.current = null;
 
     setError(null);
     setIsListening(true);
     shouldRestartRef.current = true;
+    restartAttemptsRef.current = 0;  // Reset counter when user manually starts
     
     try {
       recognitionRef.current.start();
     } catch (e) {
-      // Might already be started, try stopping and restarting
+      // Might already be started, try stopping and use attemptRestart for proper handling
       try {
         recognitionRef.current.stop();
-        setTimeout(() => {
-          if (recognitionRef.current && shouldRestartRef.current) {
-            recognitionRef.current.start();
-          }
-        }, 100);
-      } catch (e2) {
-        console.warn('Recognition start error:', e2);
+      } catch {
+        // Ignore stop errors
       }
+      // Use attemptRestart which properly tracks the timeout and handles errors
+      attemptRestart(100, true);
     }
-  }, [isSupported]);
+  }, [isSupported, attemptRestart]);
 
   const stopListening = useCallback(() => {
     // Clear any pending restart
     if (restartTimeoutRef.current) {
       clearTimeout(restartTimeoutRef.current);
     }
+    pendingRestartDelayRef.current = null;
     
     shouldRestartRef.current = false;
     setIsListening(false);
@@ -282,7 +318,7 @@ export function useSpeechRecognition(
     
     try {
       recognitionRef.current.stop();
-    } catch (e) {
+    } catch {
       // Might already be stopped
     }
   }, []);

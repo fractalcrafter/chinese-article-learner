@@ -87,6 +87,25 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Update article title
+router.put('/:id/title', (req, res) => {
+  try {
+    const { title } = req.body;
+    const id = parseInt(req.params.id);
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    updateArticle(id, { title: title.trim() });
+
+    res.json({ message: 'Title updated' });
+  } catch (error) {
+    console.error('Error updating title:', error);
+    res.status(500).json({ error: 'Failed to update title' });
+  }
+});
+
 // Update article transcription
 router.put('/:id/transcription', (req, res) => {
   try {

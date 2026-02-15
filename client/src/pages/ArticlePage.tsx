@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Volume2, Loader2, BookOpen, GraduationCap, Plus, X, Trash2, Pencil, Save, RotateCcw } from 'lucide-react';
-import { getArticle, processArticle, addVocabulary, deleteVocabulary, deleteArticle, updateTranscription } from '../lib/api';
+import { getArticle, processArticle, addVocabulary, deleteVocabulary, deleteArticle, updateTranscription, updateArticleTitle } from '../lib/api';
 import type { Article, Sentence } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 import { VocabularyCard } from '../components/VocabularyCard';
@@ -22,6 +22,8 @@ export function ArticlePage() {
   const [editedText, setEditedText] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [needsReprocessing, setNeedsReprocessing] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -118,6 +120,24 @@ export function ArticlePage() {
     }
   };
 
+  // Start editing title
+  const handleStartEditingTitle = () => {
+    setEditedTitle(article?.title || '');
+    setIsEditingTitle(true);
+  };
+
+  const handleSaveTitle = async () => {
+    if (!id || !editedTitle.trim()) return;
+    try {
+      await updateArticleTitle(parseInt(id), editedTitle.trim());
+      setArticle(prev => prev ? { ...prev, title: editedTitle.trim() } : null);
+      setIsEditingTitle(false);
+    } catch (err) {
+      console.error('Failed to update title:', err);
+      alert('Failed to update title');
+    }
+  };
+
   // Start editing: populate textarea with current transcription
   const handleStartEditing = () => {
     const currentText = article?.transcription_edited || article?.transcription_original || '';
@@ -186,9 +206,43 @@ export function ArticlePage() {
             >
               <ArrowLeft className="w-6 h-6 text-amber-800" />
             </button>
-            <h1 className="text-2xl font-bold text-amber-800">
-              {article.title || 'Untitled Article'}
-            </h1>
+            {isEditingTitle ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveTitle();
+                    if (e.key === 'Escape') setIsEditingTitle(false);
+                  }}
+                  className="text-2xl font-bold text-amber-800 border-b-2 border-amber-400 bg-transparent focus:outline-none px-1"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveTitle}
+                  className="p-1 hover:bg-green-100 rounded-full text-green-600"
+                  title="Save title"
+                >
+                  <Save className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setIsEditingTitle(false)}
+                  className="p-1 hover:bg-gray-100 rounded-full text-gray-500"
+                  title="Cancel"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              <h1
+                onClick={handleStartEditingTitle}
+                className="text-2xl font-bold text-amber-800 cursor-pointer hover:bg-amber-100 rounded px-1 -mx-1 transition-colors"
+                title="Click to edit title"
+              >
+                {article.title || 'Untitled Article'}
+              </h1>
+            )}
           </div>
           <button
             onClick={handleDeleteArticle}

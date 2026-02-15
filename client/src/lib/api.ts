@@ -62,6 +62,15 @@ export async function deleteArticle(id: number): Promise<void> {
   }
 }
 
+export async function updateArticleTitle(id: number, title: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/articles/${id}/title`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) throw new Error('Failed to update title');
+}
+
 export async function updateTranscription(id: number, transcription: string): Promise<void> {
   const response = await fetch(`${API_BASE}/articles/${id}/transcription`, {
     method: 'PUT',
