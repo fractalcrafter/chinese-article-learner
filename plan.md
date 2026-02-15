@@ -115,7 +115,11 @@ A full-stack web application using React + TypeScript frontend and Node.js + Exp
 - [x] Build user selection/login UI
 - [ ] Track article completion per user
 - [ ] Track vocabulary mastery per user
-- [ ] Add progress dashboard
+- [ ] Add progress dashboard (My Progress page + Admin view)
+  - [x] Backend: `GET /auth/users/all-progress` endpoint for admin
+  - [x] Frontend: `ProgressPage` component with summary stat cards
+  - [x] Admin view: grid of all users' progress cards (username `admin`)
+  - [x] Routing: `/progress` route + nav link in header
 - [ ] Create flashcard review mode
 
 ### Phase 6: Polish & Deployment

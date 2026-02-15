@@ -37,8 +37,10 @@ export function ArticlePage() {
       const data = await getArticle(parseInt(id!));
       setArticle(data);
       
-      // Auto-process if not yet processed
-      if (!data.summary && !data.sentences?.length) {
+      // Auto-process if not yet processed or has old failed summary
+      const hasBadSummary = data.summary && 
+        (data.summary.includes('not available') || data.summary.includes('unavailable'));
+      if ((!data.summary && !data.sentences?.length) || hasBadSummary) {
         await handleProcess();
       }
     } catch (err) {
@@ -63,7 +65,7 @@ export function ArticlePage() {
       } : null);
     } catch (err) {
       console.error('Failed to process article:', err);
-      setError('Failed to process article. Make sure your Gemini API key is configured.');
+      setError('Failed to process article. Check Azure OpenAI configuration.');
     } finally {
       setIsProcessing(false);
     }
