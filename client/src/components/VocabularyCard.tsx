@@ -33,7 +33,7 @@ export function VocabularyCard({ vocabulary, onSpeak }: VocabularyCardProps) {
     writersRef.current = [];
 
     // Determine size based on character count (smaller for more chars)
-    const size = chars.length <= 2 ? 100 : chars.length <= 3 ? 80 : 60;
+    const size = chars.length <= 2 ? 100 : 60;
 
     for (const char of chars) {
       const charDiv = document.createElement('div');
