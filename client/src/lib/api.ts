@@ -185,6 +185,26 @@ export async function getUserProgress(userId: number): Promise<UserProgress> {
   return response.json();
 }
 
+// Get all users' progress (admin view)
+export type AllUsersProgress = {
+  user: { id: number; name: string; avatar_emoji: string };
+  progress: UserProgress;
+}[];
+
+export async function getAllUsersProgress(): Promise<AllUsersProgress> {
+  const response = await fetch(`${API_BASE}/auth/users/all-progress`);
+  if (!response.ok) throw new Error('Failed to fetch all users progress');
+  return response.json();
+}
+
+// Reset user progress (admin)
+export async function resetUserProgressApi(userId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/auth/users/${userId}/progress`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to reset progress');
+}
+
 // Update article progress
 export async function updateArticleProgress(
   userId: number, 

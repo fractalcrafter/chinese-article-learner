@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Save, Loader2, AlertCircle, LogOut, Trash2, BookOpen } from 'lucide-react';
+import { Mic, MicOff, Save, Loader2, AlertCircle, LogOut, Trash2, BookOpen, BarChart3 } from 'lucide-react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { createArticle, getArticles, deleteArticle } from '../lib/api';
 import { useUser } from '../contexts/UserContext';
@@ -133,13 +133,22 @@ export function RecordPage() {
               <span className="text-2xl">{user.avatar_emoji}</span>
               <span className="font-medium text-gray-700">{user.name}</span>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1 px-3 py-1 text-gray-500 hover:text-red-500 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm">Logout</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/progress')}
+                className="flex items-center gap-1 px-3 py-1 text-gray-500 hover:text-amber-600 transition-colors"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="text-sm">Progress</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 px-3 py-1 text-gray-500 hover:text-red-500 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm">Logout</span>
+              </button>
+            </div>
           </div>
         )}
 

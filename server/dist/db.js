@@ -108,6 +108,14 @@ export function getUserById(id) {
 export function getAllUsers() {
     return db.prepare('SELECT id, name, avatar_emoji, created_at FROM users').all();
 }
+// Get progress for all users (for admin view)
+export function getAllUsersProgress() {
+    const users = getAllUsers();
+    return users.map(user => ({
+        user: { id: user.id, name: user.name, avatar_emoji: user.avatar_emoji },
+        progress: getUserProgress(user.id)
+    }));
+}
 export function authenticateUser(name, password) {
     const user = getUserByName(name);
     if (!user)
@@ -196,6 +204,11 @@ export function updateVocabularyProgress(userId, vocabularyId, correct) {
       VALUES (?, ?, 1, ?, 'learning', CURRENT_TIMESTAMP)
     `).run(userId, vocabularyId, correct ? 1 : 0);
     }
+}
+// Reset all progress data for a user
+export function resetUserProgress(userId) {
+    db.prepare('DELETE FROM user_article_progress WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM user_vocabulary_progress WHERE user_id = ?').run(userId);
 }
 // Helper function to get article by ID
 export function getArticleById(id) {

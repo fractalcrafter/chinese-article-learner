@@ -4,6 +4,7 @@ import { UserProvider, useUser } from './contexts/UserContext';
 import { RecordPage } from './pages/RecordPage';
 import { ArticlePage } from './pages/ArticlePage';
 import { LoginPage } from './pages/LoginPage';
+import { ProgressPage } from './pages/ProgressPage';
 import { Loader2 } from 'lucide-react';
 import './index.css';
 
@@ -43,6 +44,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/" element={<ProtectedRoute><RecordPage /></ProtectedRoute>} />
+      <Route path="/progress" element={<ProtectedRoute><ProgressPage /></ProtectedRoute>} />
       <Route path="/article/:id" element={<ProtectedRoute><ArticlePage /></ProtectedRoute>} />
     </Routes>
   );

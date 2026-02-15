@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createUser, authenticateUser, getAllUsers, getUserById, getUserProgress, updateArticleProgress, updateVocabularyProgress } from '../db.js';
+import { createUser, authenticateUser, getAllUsers, getAllUsersProgress, getUserById, getUserProgress, updateArticleProgress, updateVocabularyProgress, resetUserProgress } from '../db.js';
 const router = Router();
 // Get all users (for family user selection)
 router.get('/users', (req, res) => {
@@ -52,6 +52,17 @@ router.post('/login', (req, res) => {
         res.status(500).json({ error: 'Failed to login' });
     }
 });
+// Get all users' progress (for admin view)
+router.get('/users/all-progress', (req, res) => {
+    try {
+        const allProgress = getAllUsersProgress();
+        res.json(allProgress);
+    }
+    catch (error) {
+        console.error('Error fetching all users progress:', error);
+        res.status(500).json({ error: 'Failed to fetch all users progress' });
+    }
+});
 // Get user progress
 router.get('/users/:id/progress', (req, res) => {
     try {
@@ -91,6 +102,18 @@ router.post('/users/:id/vocabulary-progress', (req, res) => {
     catch (error) {
         console.error('Error updating vocabulary progress:', error);
         res.status(500).json({ error: 'Failed to update progress' });
+    }
+});
+// Reset user progress (admin)
+router.delete('/users/:id/progress', (req, res) => {
+    try {
+        const userId = parseInt(req.params.id);
+        resetUserProgress(userId);
+        res.json({ success: true });
+    }
+    catch (error) {
+        console.error('Error resetting progress:', error);
+        res.status(500).json({ error: 'Failed to reset progress' });
     }
 });
 export default router;
