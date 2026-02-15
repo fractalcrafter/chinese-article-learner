@@ -158,9 +158,61 @@ export function RecordPage() {
             🐵 Monkey
           </h1>
           <p className="text-amber-600">
-            Record a Chinese article to start learning
+            Learn Chinese through articles
           </p>
         </div>
+
+        {/* Previous Articles */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+          <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-amber-600" />
+            My Articles
+          </h3>
+          
+          {loadingArticles ? (
+            <div className="text-center py-4 text-gray-500">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+              Loading...
+            </div>
+          ) : articles.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">
+              No articles yet. Add your first Chinese article below!
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {articles.map((article) => (
+                <div
+                  key={article.id}
+                  onClick={() => navigate(`/article/${article.id}`)}
+                  className="flex items-center justify-between p-3 bg-amber-50 hover:bg-amber-100 rounded-xl cursor-pointer transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-800 truncate">
+                      {article.title || 'Untitled Article'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(article.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteArticle(article.id, e)}
+                    className="p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                    title="Delete article"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Add New Article Section */}
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <Mic className="w-5 h-5 text-amber-600" />
+            Add New Article
+          </h3>
 
         {/* Title Input */}
         <div className="mb-4">
@@ -224,7 +276,7 @@ export function RecordPage() {
         )}
 
         {/* Transcription Area */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+        <div className="mb-6">
           <label className="block text-sm font-medium text-gray-500 mb-2">
             Transcription (click to edit)
           </label>
@@ -234,7 +286,7 @@ export function RecordPage() {
             placeholder="Your Chinese transcription will appear here...
 
 Click 'Start Recording' and speak in Chinese, or type/paste text directly."
-            className="w-full h-64 p-4 text-xl leading-relaxed border-2 border-gray-200 rounded-xl focus:border-amber-400 focus:outline-none resize-none"
+            className="w-full h-48 p-4 text-xl leading-relaxed border-2 border-gray-200 rounded-xl focus:border-amber-400 focus:outline-none resize-none"
             style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
           />
           
@@ -287,7 +339,7 @@ Click 'Start Recording' and speak in Chinese, or type/paste text directly."
         </div>
 
         {/* Tips */}
-        <div className="mt-8 bg-amber-100 rounded-xl p-4">
+        <div className="mt-6 bg-amber-100 rounded-xl p-4">
           <h3 className="font-semibold text-amber-800 mb-2">💡 Tips</h3>
           <ul className="text-amber-700 text-sm space-y-1">
             <li>• Speak clearly and at a normal pace</li>
@@ -296,50 +348,6 @@ Click 'Start Recording' and speak in Chinese, or type/paste text directly."
             <li>• Works best in Chrome or Edge browsers</li>
           </ul>
         </div>
-
-        {/* Previous Articles */}
-        <div className="mt-8 bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-amber-600" />
-            Previous Articles
-          </h3>
-          
-          {loadingArticles ? (
-            <div className="text-center py-4 text-gray-500">
-              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-              Loading...
-            </div>
-          ) : articles.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">
-              No articles yet. Record or paste your first Chinese article above!
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {articles.map((article) => (
-                <div
-                  key={article.id}
-                  onClick={() => navigate(`/article/${article.id}`)}
-                  className="flex items-center justify-between p-3 bg-amber-50 hover:bg-amber-100 rounded-xl cursor-pointer transition-colors group"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-800 truncate">
-                      {article.title || 'Untitled Article'}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(article.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => handleDeleteArticle(article.id, e)}
-                    className="p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Delete article"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
