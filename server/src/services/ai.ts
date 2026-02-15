@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { AzureOpenAI } from 'openai';
 import translateModule from 'google-translate-api-x';
 import pinyinModule from 'pinyin';
 
@@ -9,8 +9,16 @@ const STYLE_TONE = (pinyinModule as any).STYLE_TONE || (pinyinModule as any).def
 // Get translate function
 const translate = (translateModule as any).default || translateModule;
 
-// Initialize Gemini client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Initialize Azure OpenAI client
+const azureOpenAI = process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_KEY
+  ? new AzureOpenAI({
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+      apiKey: process.env.AZURE_OPENAI_KEY,
+      apiVersion: '2024-10-21',
+    })
+  : null;
+
+const DEPLOYMENT_NAME = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o';
 
 // Sentence structure for article breakdown
 export interface Sentence {
@@ -29,27 +37,30 @@ export interface VocabularyItem {
 }
 
 /**
- * Generate a summary of the Chinese article using Gemini
+ * Generate a summary of the Chinese article using Azure OpenAI
  */
 export async function generateSummary(chineseText: string): Promise<string> {
-  if (!process.env.GEMINI_API_KEY) {
-    return 'Summary not available (Gemini API key not configured)';
+  if (!azureOpenAI) {
+    return 'Summary not available (Azure OpenAI not configured)';
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const prompt = `You are helping an 8th grader learn Chinese. Analyze this Chinese article and provide a brief summary in English (2-3 sentences) that explains:
-1. What the article is about
-2. Key information or main points
+    const result = await azureOpenAI.chat.completions.create({
+      model: DEPLOYMENT_NAME,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are helping an 8th grader learn Chinese. Provide brief summaries in English (2-3 sentences).'
+        },
+        {
+          role: 'user',
+          content: `Analyze this Chinese article and provide a brief summary in English (2-3 sentences) that explains:\n1. What the article is about\n2. Key information or main points\n\nChinese article:\n${chineseText}\n\nRespond with only the summary in English, no additional formatting.`
+        }
+      ],
+      temperature: 0.3,
+    });
 
-Chinese article:
-${chineseText}
-
-Respond with only the summary in English, no additional formatting.`;
-
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    return result.choices[0]?.message?.content?.trim() || 'Summary generation failed';
   } catch (error) {
     console.error('Error generating summary:', error);
     return 'Summary generation failed';
@@ -143,17 +154,24 @@ export async function processSentences(chineseText: string): Promise<Sentence[]>
 }
 
 /**
- * Extract key vocabulary from the article using Gemini
+ * Extract key vocabulary from the article using Azure OpenAI
  */
 export async function extractVocabulary(chineseText: string): Promise<VocabularyItem[]> {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!azureOpenAI) {
     return [];
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const prompt = `You are helping an 8th grader learn Chinese vocabulary. From this Chinese article, identify 5-8 key vocabulary words/phrases (commonly 2-character phrases) that would be most useful for a student to learn.
+    const result = await azureOpenAI.chat.completions.create({
+      model: DEPLOYMENT_NAME,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are helping an 8th grader learn Chinese vocabulary. Respond in JSON format only, no markdown.'
+        },
+        {
+          role: 'user',
+          content: `From this Chinese article, identify 5-8 key vocabulary words/phrases (commonly 2-character phrases) that would be most useful for a student to learn.
 
 For each word, provide:
 1. The Chinese word/phrase (commonly 2 characters, e.g., 上映, 领域)
@@ -174,11 +192,13 @@ Respond in JSON format only, no markdown:
     "example": "这部电影下周上映。",
     "emoji": "🎬"
   }
-]`;
+]`
+        }
+      ],
+      temperature: 0.3,
+    });
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    
+    const text = result.choices[0]?.message?.content?.trim() || '[]';
     // Parse JSON response (handle potential markdown code blocks)
     const jsonStr = text.replace(/```json\n?|\n?```/g, '').trim();
     return JSON.parse(jsonStr);
@@ -205,28 +225,32 @@ export function getPinyin(chinese: string): string {
 }
 
 /**
- * Translate a single word or phrase using Gemini for dictionary-quality results
- * Falls back to google-translate if Gemini is unavailable
+ * Translate a single word or phrase using Azure OpenAI for dictionary-quality results
+ * Falls back to google-translate if Azure OpenAI is unavailable
  */
 export async function translateText(text: string, from = 'zh-CN', to = 'en'): Promise<string> {
-  // Use Gemini only for Chinese→English (dictionary-quality translations)
-  if (process.env.GEMINI_API_KEY && from.startsWith('zh') && to === 'en') {
+  // Use Azure OpenAI only for Chinese→English (dictionary-quality translations)
+  if (azureOpenAI && from.startsWith('zh') && to === 'en') {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const prompt = `Translate this Chinese word/phrase to English in dictionary style. Give the most common meanings separated by " / ". Be concise like a dictionary entry. Do NOT include the Chinese characters, pinyin, or any extra explanation.
+      const result = await azureOpenAI.chat.completions.create({
+        model: DEPLOYMENT_NAME,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a Chinese-English dictionary. Give concise dictionary-style translations only.'
+          },
+          {
+            role: 'user',
+            content: `Translate this Chinese word/phrase to English in dictionary style. Give the most common meanings separated by " / ". Be concise like a dictionary entry. Do NOT include the Chinese characters, pinyin, or any extra explanation.\n\nChinese: ${text}\n\nRespond with ONLY the English translation, nothing else.`
+          }
+        ],
+        temperature: 0.1,
+      });
 
-Chinese: ${text}
-
-Example format: to show (a movie) / to screen
-Example format: domain / sphere / field / territory / area
-
-Respond with ONLY the English translation, nothing else.`;
-      
-      const result = await model.generateContent(prompt);
-      const translation = result.response.text().trim();
+      const translation = result.choices[0]?.message?.content?.trim();
       if (translation) return translation;
     } catch (e) {
-      console.error('Gemini translation failed, falling back to google-translate:', e);
+      console.error('Azure OpenAI translation failed, falling back to google-translate:', e);
     }
   }
 

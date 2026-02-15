@@ -133,14 +133,18 @@ router.post('/:id/process', async (req, res) => {
 
     const text = article.transcription_edited || article.transcription_original;
 
-    // Generate summary (gracefully handle failures)
+    // Generate summary (skip if already saved)
     console.log('Generating summary...');
-    let summary = '';
-    try {
-      summary = await generateSummary(text);
-    } catch (e) {
-      console.error('Summary generation failed, continuing without it');
-      summary = '(Summary unavailable - check Gemini API key)';
+    let summary = article.summary || '';
+    if (!summary || summary.includes('not available') || summary.includes('unavailable')) {
+      try {
+        summary = await generateSummary(text);
+      } catch (e) {
+        console.error('Summary generation failed, continuing without it');
+        summary = '(Summary unavailable - check Azure OpenAI configuration)';
+      }
+    } else {
+      console.log('Using existing saved summary');
     }
 
     // Process sentences (this should work even without Gemini)
