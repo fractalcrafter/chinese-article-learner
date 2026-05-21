@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Volume2, RotateCcw, Check, X, Trophy } from 'lucide-react';
+import {
+  ArrowLeft, Loader2, Volume2, Check, X, Trophy, RotateCcw, ArrowRight,
+} from 'lucide-react';
 import { getStudySet, type StudySet, type StudySetItem } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 
-// Distance to push a "don't know" item back in the queue so it doesn't repeat immediately.
-const REQUEUE_GAP = 4;
+const ROUND_SIZE = 5;
 
-interface ItemStats {
-  dontKnowCount: number;
-  finalKnown: boolean;
+type Direction = 'zh-to-en' | 'zh-to-pinyin';
+
+interface Question {
+  item: StudySetItem;
+  direction: Direction;
+  options: StudySetItem[]; // includes the correct item
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -21,6 +25,13 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+function buildQuestion(item: StudySetItem, allItems: StudySetItem[]): Question {
+  const direction: Direction = Math.random() < 0.5 ? 'zh-to-en' : 'zh-to-pinyin';
+  const pool = allItems.filter(i => i.id !== item.id);
+  const distractors = shuffle(pool).slice(0, Math.min(3, pool.length));
+  return { item, direction, options: shuffle([item, ...distractors]) };
+}
+
 export function LearnPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -28,115 +39,147 @@ export function LearnPage() {
   const [set, setSet] = useState<StudySet | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Queue of itemIds still being studied; stats keyed by itemId
-  const [queue, setQueue] = useState<number[]>([]);
-  const [stats, setStats] = useState<Record<number, ItemStats>>({});
-  const [knownIds, setKnownIds] = useState<number[]>([]);
-  const [flipped, setFlipped] = useState(false);
+  // Session-wide
+  const [masteredIds, setMasteredIds] = useState<Set<number>>(new Set());
+  const [roundNumber, setRoundNumber] = useState(1);
+
+  // Round state
+  const [roundItems, setRoundItems] = useState<StudySetItem[]>([]); // the items in this round (pre-shuffled order)
+  const [queue, setQueue] = useState<StudySetItem[]>([]); // active question queue (head = current)
+  const [firstTryFailed, setFirstTryFailed] = useState<Set<number>>(new Set());
+  const [question, setQuestion] = useState<Question | null>(null);
+  const [feedback, setFeedback] = useState<null | { correct: boolean; chosen: StudySetItem }>(null);
+  const [phase, setPhase] = useState<'question' | 'review' | 'done'>('question');
 
   const { speak } = useSpeechSynthesis();
 
-  const itemMap = useMemo(() => {
-    const m: Record<number, StudySetItem> = {};
-    set?.items.forEach(i => { m[i.id] = i; });
-    return m;
-  }, [set]);
+  const allItems = useMemo(() => set?.items ?? [], [set]);
+  const total = allItems.length;
+  const masteredCount = masteredIds.size;
 
-  const initialize = (items: StudySetItem[]) => {
-    const ids = shuffle(items.map(i => i.id));
-    setQueue(ids);
-    setStats(Object.fromEntries(items.map(i => [i.id, { dontKnowCount: 0, finalKnown: false }])));
-    setKnownIds([]);
-    setFlipped(false);
-  };
-
+  // ============ Loading ============
   useEffect(() => {
     (async () => {
       try {
         const s = await getStudySet(setId);
         setSet(s);
-        initialize(s.items);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     })();
   }, [setId]);
 
-  const currentId = queue[0];
-  const current = currentId !== undefined ? itemMap[currentId] : null;
-  const total = set?.items.length ?? 0;
-  const knownCount = knownIds.length;
-  const isComplete = !loading && total > 0 && queue.length === 0;
-
-  const markKnown = () => {
-    if (!current) return;
-    setKnownIds(prev => [...prev, current.id]);
-    setStats(prev => ({
-      ...prev,
-      [current.id]: { ...prev[current.id], finalKnown: true },
-    }));
-    setQueue(prev => prev.slice(1));
-    setFlipped(false);
+  // ============ Round init ============
+  const startRound = (mastered: Set<number>, roundNum: number) => {
+    if (!set) return;
+    const remaining = set.items.filter(i => !mastered.has(i.id));
+    if (remaining.length === 0) {
+      setPhase('done');
+      return;
+    }
+    const next = shuffle(remaining).slice(0, Math.min(ROUND_SIZE, remaining.length));
+    setRoundItems(next);
+    setQueue(next);
+    setFirstTryFailed(new Set());
+    setFeedback(null);
+    setRoundNumber(roundNum);
+    setPhase('question');
+    setQuestion(buildQuestion(next[0], set.items));
   };
 
-  const markDontKnow = () => {
-    if (!current) return;
-    setStats(prev => ({
-      ...prev,
-      [current.id]: {
-        dontKnowCount: (prev[current.id]?.dontKnowCount ?? 0) + 1,
-        finalKnown: false,
-      },
-    }));
-    setQueue(prev => {
-      const [head, ...rest] = prev;
-      const insertAt = Math.min(REQUEUE_GAP, rest.length);
-      return [...rest.slice(0, insertAt), head, ...rest.slice(insertAt)];
-    });
-    setFlipped(false);
+  // Auto-start first round when set loads
+  useEffect(() => {
+    if (set && phase === 'question' && !question && roundItems.length === 0) {
+      startRound(new Set(), 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [set]);
+
+  // ============ Answer handling ============
+  const handleAnswer = (chosen: StudySetItem) => {
+    if (!question || feedback) return;
+    const correct = chosen.id === question.item.id;
+    setFeedback({ correct, chosen });
+    if (!correct) {
+      setFirstTryFailed(prev => {
+        const n = new Set(prev);
+        n.add(question.item.id);
+        return n;
+      });
+    }
+  };
+
+  const advance = () => {
+    if (!question || !set) return;
+    const wasCorrect = feedback?.correct;
+    const currentItem = question.item;
+    setFeedback(null);
+
+    let newQueue = queue;
+    let newMastered = masteredIds;
+
+    if (wasCorrect) {
+      // Remove the current item from the queue
+      newQueue = queue.filter(i => i.id !== currentItem.id);
+      // If they never failed it in this round, count as mastered
+      if (!firstTryFailed.has(currentItem.id)) {
+        newMastered = new Set(masteredIds);
+        newMastered.add(currentItem.id);
+        setMasteredIds(newMastered);
+      }
+    } else {
+      // Move to back of queue
+      newQueue = [...queue.slice(1), queue[0]];
+    }
+    setQueue(newQueue);
+
+    if (newQueue.length === 0) {
+      setPhase('review');
+      setQuestion(null);
+    } else {
+      // Avoid immediate repeat of the same item if possible
+      let nextItem = newQueue[0];
+      if (newQueue.length > 1 && nextItem.id === currentItem.id) {
+        nextItem = newQueue[1];
+      }
+      setQuestion(buildQuestion(nextItem, set.items));
+    }
+  };
+
+  const continueToNextRound = () => {
+    startRound(masteredIds, roundNumber + 1);
   };
 
   const restartAll = () => {
-    if (!set) return;
-    initialize(set.items);
+    setMasteredIds(new Set());
+    setRoundItems([]);
+    setQueue([]);
+    setFirstTryFailed(new Set());
+    setQuestion(null);
+    setFeedback(null);
+    setPhase('question');
+    startRound(new Set(), 1);
   };
 
-  const restartDontKnowsOnly = () => {
-    if (!set) return;
-    const dontKnowItems = set.items.filter(i => (stats[i.id]?.dontKnowCount ?? 0) > 0);
-    if (dontKnowItems.length === 0) {
-      restartAll();
-      return;
-    }
-    initialize(dontKnowItems);
-  };
-
-  // Keyboard shortcuts
-  const currentIdRef = useRef(currentId);
-  const flippedRef = useRef(flipped);
-  useEffect(() => { currentIdRef.current = currentId; }, [currentId]);
-  useEffect(() => { flippedRef.current = flipped; }, [flipped]);
-
+  // Keyboard shortcut: Enter advances after feedback / continues from review
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (currentIdRef.current === undefined) return;
-      if (e.key === ' ') {
-        e.preventDefault();
-        setFlipped(f => !f);
-      } else if (flippedRef.current) {
-        if (e.key === '2' || e.key === 'ArrowRight') {
+      if (e.key === 'Enter' || e.key === ' ') {
+        if (feedback) { e.preventDefault(); advance(); }
+        else if (phase === 'review') { e.preventDefault(); continueToNextRound(); }
+      } else if (phase === 'question' && !feedback && question) {
+        const num = parseInt(e.key);
+        if (!isNaN(num) && num >= 1 && num <= question.options.length) {
           e.preventDefault();
-          markKnown();
-        } else if (e.key === '1' || e.key === 'ArrowLeft') {
-          e.preventDefault();
-          markDontKnow();
+          handleAnswer(question.options[num - 1]);
         }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [feedback, phase, question]);
 
+  // ============ Render ============
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-amber-50 to-orange-50">
@@ -153,9 +196,9 @@ export function LearnPage() {
     );
   }
 
-  // Completion stats
-  const dontKnowItems = set.items.filter(i => (stats[i.id]?.dontKnowCount ?? 0) > 0);
-  const firstTryKnown = set.items.filter(i => stats[i.id]?.finalKnown && (stats[i.id]?.dontKnowCount ?? 0) === 0).length;
+  // Round progress: how many round items have been mastered or removed
+  const roundRemaining = queue.length;
+  const roundDone = roundItems.length - roundRemaining;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50">
@@ -167,43 +210,46 @@ export function LearnPage() {
           <ArrowLeft className="w-4 h-4" /> Back to set
         </button>
 
-        <div className="flex items-center justify-between mb-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-amber-800">{set.title}</h1>
           <span className="text-sm text-gray-600 font-medium">
-            {knownCount} / {total} known
+            {masteredCount} / {total} mastered
           </span>
         </div>
 
-        {/* Progress bar */}
-        <div className="w-full h-2 bg-amber-100 rounded-full mb-6 overflow-hidden">
-          <div
-            className="h-full bg-purple-500 transition-all"
-            style={{ width: `${(knownCount / total) * 100}%` }}
-          />
+        {/* Overall progress bar */}
+        <div className="mb-2">
+          <div className="w-full h-2 bg-amber-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-purple-500 transition-all"
+              style={{ width: `${(masteredCount / total) * 100}%` }}
+            />
+          </div>
         </div>
 
-        {isComplete ? (
+        {/* Round progress (inline) */}
+        {phase !== 'done' && (
+          <div className="flex items-center justify-between text-xs text-gray-500 mb-6">
+            <span>Round {roundNumber}</span>
+            {phase === 'question' && roundItems.length > 0 && (
+              <span>{roundDone} / {roundItems.length} in this round</span>
+            )}
+          </div>
+        )}
+
+        {/* ============== DONE ============== */}
+        {phase === 'done' ? (
           <div className="bg-white rounded-3xl shadow-xl p-10 text-center">
             <Trophy className="w-20 h-20 text-amber-500 mx-auto mb-4" />
-            <h2 className="text-3xl font-bold text-gray-800 mb-2">All done! 🎉</h2>
-            <p className="text-gray-600 mb-2">You marked all {total} terms as known.</p>
-            <p className="text-sm text-gray-500 mb-6">
-              {firstTryKnown} on first try · {dontKnowItems.length} needed review
-            </p>
-            <div className="flex flex-wrap gap-3 justify-center">
-              {dontKnowItems.length > 0 && (
-                <button
-                  onClick={restartDontKnowsOnly}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-semibold"
-                >
-                  <RotateCcw className="w-5 h-5" /> Review {dontKnowItems.length} I missed
-                </button>
-              )}
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">You mastered it all! 🎉</h2>
+            <p className="text-gray-600 mb-6">All {total} terms mastered.</p>
+            <div className="flex gap-3 justify-center">
               <button
                 onClick={restartAll}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold"
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-semibold"
               >
-                <RotateCcw className="w-5 h-5" /> Restart all
+                <RotateCcw className="w-5 h-5" /> Start over
               </button>
               <button
                 onClick={() => navigate(`/sets/${setId}`)}
@@ -213,115 +259,197 @@ export function LearnPage() {
               </button>
             </div>
           </div>
-        ) : current ? (
-          <>
-            {/* Card */}
-            <div
-              onClick={() => setFlipped(f => !f)}
-              className="relative w-full h-80 bg-white rounded-3xl shadow-xl cursor-pointer mb-6 select-none"
-              style={{ perspective: '1000px' }}
-            >
-              <div
-                className="absolute inset-0 transition-transform duration-500"
-                style={{
-                  transformStyle: 'preserve-3d',
-                  transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                }}
-              >
-                {/* Front - Chinese */}
-                <div
-                  className="absolute inset-0 flex flex-col items-center justify-center p-8"
-                  style={{ backfaceVisibility: 'hidden' }}
-                >
-                  <p
-                    className="text-6xl font-bold text-gray-800 text-center"
-                    style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+        ) : phase === 'review' ? (
+          /* ============== ROUND REVIEW ============== */
+          <div className="bg-white rounded-3xl shadow-xl p-6">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold mb-3">
+                <Check className="w-4 h-4" /> Round {roundNumber} complete
+              </div>
+              <h2 className="text-xl font-bold text-gray-800">Review what you just learned</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {roundItems.filter(i => masteredIds.has(i.id) && !firstTryFailed.has(i.id)).length} mastered ·
+                {' '}{roundItems.filter(i => firstTryFailed.has(i.id)).length} need more practice
+              </p>
+            </div>
+
+            <div className="space-y-2 mb-6">
+              {roundItems.map(item => {
+                const mastered = masteredIds.has(item.id);
+                const failed = firstTryFailed.has(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 ${
+                      mastered && !failed
+                        ? 'bg-green-50 border-green-200'
+                        : failed
+                          ? 'bg-amber-50 border-amber-200'
+                          : 'bg-gray-50 border-gray-200'
+                    }`}
                   >
-                    {current.chinese}
-                  </p>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); speak(current.chinese); }}
-                    className="mt-6 p-3 bg-amber-100 hover:bg-amber-200 rounded-full"
-                    title="Listen"
-                  >
-                    <Volume2 className="w-6 h-6 text-amber-700" />
-                  </button>
-                  <p className="absolute bottom-4 text-xs text-gray-400">
-                    Click or press space to reveal
-                  </p>
-                </div>
-                {/* Back - Pinyin + English */}
-                <div
-                  className="absolute inset-0 flex flex-col items-center justify-center p-8"
-                  style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-                >
-                  <p
-                    className="text-3xl font-medium text-gray-700 mb-3"
-                    style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
-                  >
-                    {current.chinese}
-                  </p>
-                  <p className="text-2xl font-medium text-amber-700 mb-2">{current.pinyin}</p>
-                  <p className="text-xl text-gray-700 text-center">{current.english}</p>
-                  {current.example_sentence && (
-                    <p
-                      className="mt-4 text-base text-gray-500 text-center italic"
-                      style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+                    <div className="flex-shrink-0">
+                      <p
+                        className="text-2xl font-bold text-gray-800"
+                        style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                      >
+                        {item.chinese}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => speak(item.chinese)}
+                      className="p-1.5 text-amber-700 hover:bg-amber-100 rounded-full flex-shrink-0"
+                      title="Listen"
                     >
-                      {current.example_sentence}
-                    </p>
-                  )}
-                </div>
+                      <Volume2 className="w-4 h-4" />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-amber-700 font-medium">{item.pinyin}</p>
+                      <p className="text-sm text-gray-700">{item.english}</p>
+                    </div>
+                    {mastered && !failed ? (
+                      <span title="Got it first try" className="text-green-600">
+                        <Check className="w-5 h-5" />
+                      </span>
+                    ) : failed ? (
+                      <span title="Needed more tries" className="text-amber-600 text-xs font-medium">
+                        review
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={continueToNextRound}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-semibold shadow-lg"
+            >
+              {masteredCount >= total ? (
+                <>Finish <Trophy className="w-5 h-5" /></>
+              ) : (
+                <>Continue to Round {roundNumber + 1} <ArrowRight className="w-5 h-5" /></>
+              )}
+            </button>
+            <p className="text-center text-xs text-gray-400 mt-2">Press Enter to continue</p>
+          </div>
+        ) : question ? (
+          /* ============== QUESTION ============== */
+          <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">
+            <p className="text-sm text-gray-500 text-center mb-4">
+              {question.direction === 'zh-to-en' ? 'Choose the meaning' : 'Choose the pinyin'}
+            </p>
+
+            {/* Prompt — always Chinese characters */}
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                <p
+                  className="text-4xl sm:text-5xl font-bold text-gray-800 break-words"
+                  style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                >
+                  {question.item.chinese}
+                </p>
+                <button
+                  onClick={() => speak(question.item.chinese)}
+                  className="p-2 bg-amber-100 hover:bg-amber-200 rounded-full"
+                  title="Listen"
+                >
+                  <Volume2 className="w-5 h-5 text-amber-700" />
+                </button>
               </div>
             </div>
 
-            {/* Action buttons */}
-            {flipped ? (
-              <div className="grid grid-cols-2 gap-3">
+            {/* Options */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {question.options.map((opt, i) => {
+                const isCorrect = opt.id === question.item.id;
+                const isChosen = feedback?.chosen.id === opt.id;
+                let cls = 'border-amber-200 bg-amber-50 hover:bg-amber-100';
+                if (feedback) {
+                  if (isCorrect) cls = 'border-green-400 bg-green-50';
+                  else if (isChosen) cls = 'border-red-400 bg-red-50';
+                  else cls = 'border-amber-200 bg-amber-50 opacity-50';
+                }
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => handleAnswer(opt)}
+                    disabled={!!feedback}
+                    className={`flex items-start gap-2 p-4 rounded-xl text-left transition-all border-2 ${cls}`}
+                  >
+                    <span className="text-xs text-gray-400 font-mono mt-1 flex-shrink-0">{i + 1}</span>
+                    {question.direction === 'zh-to-en' ? (
+                      <span className="text-gray-800 break-words">{opt.english}</span>
+                    ) : (
+                      <span className="text-amber-800 font-medium break-words">{opt.pinyin}</span>
+                    )}
+                    {feedback && isCorrect && (
+                      <Check className="w-5 h-5 text-green-600 ml-auto flex-shrink-0" />
+                    )}
+                    {feedback && isChosen && !isCorrect && (
+                      <X className="w-5 h-5 text-red-600 ml-auto flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Feedback panel */}
+            {feedback && (
+              <div
+                className={`mt-6 p-4 rounded-xl flex flex-col sm:flex-row sm:items-start gap-3 ${
+                  feedback.correct
+                    ? 'bg-green-50 border-2 border-green-300'
+                    : 'bg-red-50 border-2 border-red-300'
+                }`}
+              >
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  {feedback.correct ? (
+                    <Check className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <X className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-semibold ${feedback.correct ? 'text-green-800' : 'text-red-800'}`}>
+                      {feedback.correct ? 'Correct!' : 'Not quite — we\'ll come back to it'}
+                    </p>
+                    <p className="text-sm text-gray-700 mt-1 break-words">
+                      <span
+                        className="font-medium"
+                        style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+                      >
+                        {question.item.chinese}
+                      </span>
+                      {' '}({question.item.pinyin}) — {question.item.english}
+                    </p>
+                  </div>
+                </div>
                 <button
-                  onClick={markDontKnow}
-                  className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold shadow-lg"
+                  onClick={advance}
+                  className="px-4 py-2 rounded-lg bg-white shadow hover:shadow-md text-sm font-medium w-full sm:w-auto flex-shrink-0"
                 >
-                  <X className="w-5 h-5" /> Don't know
-                </button>
-                <button
-                  onClick={markKnown}
-                  className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-green-500 hover:bg-green-600 text-white font-semibold shadow-lg"
-                >
-                  <Check className="w-5 h-5" /> Known
+                  Continue →
                 </button>
               </div>
-            ) : (
-              <button
-                onClick={() => setFlipped(true)}
-                className="w-full px-6 py-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-lg"
-              >
-                Reveal answer
-              </button>
             )}
 
-            {/* Queue info */}
-            <p className="text-center text-sm text-gray-500 mt-4">
-              {queue.length} {queue.length === 1 ? 'card' : 'cards'} left in this round
-              {(stats[current.id]?.dontKnowCount ?? 0) > 0 && (
-                <span className="ml-2 text-orange-600">
-                  · seen {stats[current.id].dontKnowCount + 1}×
-                </span>
-              )}
-            </p>
-
-            <p className="text-center text-xs text-gray-400 mt-2">
-              Shortcuts: space to flip · ← / 1 = don't know · → / 2 = known
-            </p>
-
-            <button
-              onClick={restartAll}
-              className="mt-6 flex items-center gap-1 mx-auto text-sm text-gray-500 hover:text-gray-700"
-            >
-              <RotateCcw className="w-4 h-4" /> Restart session
-            </button>
-          </>
+            {!feedback && (
+              <p className="text-center text-xs text-gray-400 mt-4">
+                Tip: press 1–{question.options.length} to choose · Enter to continue after feedback
+              </p>
+            )}
+          </div>
         ) : null}
+
+        {/* Restart */}
+        {phase !== 'done' && (
+          <button
+            onClick={restartAll}
+            className="mt-6 flex items-center gap-1 mx-auto text-sm text-gray-500 hover:text-gray-700"
+          >
+            <RotateCcw className="w-4 h-4" /> Restart session
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Volume2, Shuffle, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import {
+  ArrowLeft, Loader2, Volume2, Shuffle, ChevronLeft, ChevronRight,
+  RotateCcw, Check, X, Target, Trophy,
+} from 'lucide-react';
 import { getStudySet, type StudySet, type StudySetItem } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
+
+type Status = 'unseen' | 'known' | 'dont_know';
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -23,6 +28,8 @@ export function FlashcardsPage() {
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [isShuffled, setIsShuffled] = useState(false);
+  const [trackProgress, setTrackProgress] = useState(false);
+  const [statuses, setStatuses] = useState<Record<number, Status>>({});
   const { speak } = useSpeechSynthesis();
 
   useEffect(() => {
@@ -42,6 +49,17 @@ export function FlashcardsPage() {
     [idx, order.length]
   );
 
+  const knownCount = useMemo(
+    () => Object.values(statuses).filter(s => s === 'known').length,
+    [statuses]
+  );
+  const dontKnowCount = useMemo(
+    () => Object.values(statuses).filter(s => s === 'dont_know').length,
+    [statuses]
+  );
+  const reviewedAll = order.length > 0 &&
+    order.every(item => statuses[item.id] && statuses[item.id] !== 'unseen');
+
   const next = () => {
     setFlipped(false);
     setIdx(i => Math.min(i + 1, order.length - 1));
@@ -49,6 +67,16 @@ export function FlashcardsPage() {
   const prev = () => {
     setFlipped(false);
     setIdx(i => Math.max(i - 1, 0));
+  };
+  const markAndAdvance = (status: Exclude<Status, 'unseen'>) => {
+    if (!current) return;
+    setStatuses(s => ({ ...s, [current.id]: status }));
+    if (idx < order.length - 1) {
+      setFlipped(false);
+      setIdx(i => i + 1);
+    } else {
+      setFlipped(false);
+    }
   };
   const toggleShuffle = () => {
     if (isShuffled && set) {
@@ -62,17 +90,36 @@ export function FlashcardsPage() {
     setFlipped(false);
   };
   const restart = () => { setIdx(0); setFlipped(false); };
+  const resetProgress = () => {
+    setStatuses({});
+    setIdx(0);
+    setFlipped(false);
+  };
+  const studyDontKnows = () => {
+    const remaining = order.filter(item => statuses[item.id] === 'dont_know');
+    if (remaining.length === 0) return;
+    setOrder(remaining);
+    setStatuses({});
+    setIdx(0);
+    setFlipped(false);
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === ' ') { e.preventDefault(); setFlipped(f => !f); }
-      else if (e.key === 'ArrowRight') next();
-      else if (e.key === 'ArrowLeft') prev();
+      if (e.key === ' ') { e.preventDefault(); setFlipped(f => !f); return; }
+      if (trackProgress) {
+        if (e.key === 'ArrowRight') { e.preventDefault(); markAndAdvance('known'); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); markAndAdvance('dont_know'); }
+      } else {
+        if (e.key === 'ArrowRight') next();
+        else if (e.key === 'ArrowLeft') prev();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [order.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.length, idx, trackProgress, current?.id]);
 
   if (loading) {
     return (
@@ -105,13 +152,88 @@ export function FlashcardsPage() {
           <span className="text-sm text-gray-600 font-medium">{progress}</span>
         </div>
 
+        {/* Track Progress toggle + stats */}
+        <div className="flex items-center justify-between bg-white rounded-xl shadow-sm p-3 mb-4">
+          <button
+            onClick={() => setTrackProgress(t => !t)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              trackProgress
+                ? 'bg-purple-500 text-white hover:bg-purple-600'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title="When on, ← marks Don't know, → marks Known"
+          >
+            <Target className="w-4 h-4" />
+            Track Progress {trackProgress ? 'ON' : 'OFF'}
+          </button>
+          {trackProgress && (
+            <div className="flex items-center gap-3 text-sm">
+              <span className="flex items-center gap-1 text-green-700">
+                <Check className="w-4 h-4" /> {knownCount}
+              </span>
+              <span className="flex items-center gap-1 text-red-600">
+                <X className="w-4 h-4" /> {dontKnowCount}
+              </span>
+              <button
+                onClick={resetProgress}
+                className="text-xs text-gray-500 hover:text-gray-800 underline"
+                title="Reset progress"
+              >
+                reset
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Completion banner */}
+        {trackProgress && reviewedAll && (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-4 flex items-center gap-3">
+            <Trophy className="w-8 h-8 text-amber-500 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold text-amber-900">All cards reviewed!</p>
+              <p className="text-sm text-amber-700">
+                {knownCount} known · {dontKnowCount} still don't know
+              </p>
+            </div>
+            {dontKnowCount > 0 && (
+              <button
+                onClick={studyDontKnows}
+                className="px-3 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold"
+              >
+                Study {dontKnowCount} missed
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Progress bar */}
         <div className="w-full h-2 bg-amber-100 rounded-full mb-6 overflow-hidden">
           <div
             className="h-full bg-amber-500 transition-all"
-            style={{ width: `${((idx + 1) / order.length) * 100}%` }}
+            style={{
+              width: `${
+                trackProgress
+                  ? ((knownCount + dontKnowCount) / order.length) * 100
+                  : ((idx + 1) / order.length) * 100
+              }%`,
+            }}
           />
         </div>
+
+        {/* Current-card status badge */}
+        {trackProgress && current && statuses[current.id] && (
+          <div className="text-center mb-2">
+            {statuses[current.id] === 'known' ? (
+              <span className="inline-flex items-center gap-1 text-green-700 text-xs font-medium bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                <Check className="w-3 h-3" /> Marked known
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-red-700 text-xs font-medium bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                <X className="w-3 h-3" /> Still don't know
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Card */}
         <div
@@ -128,11 +250,11 @@ export function FlashcardsPage() {
           >
             {/* Front - Chinese */}
             <div
-              className="absolute inset-0 flex flex-col items-center justify-center p-8 backface-hidden"
+              className="absolute inset-0 flex flex-col items-center justify-center p-6 sm:p-8"
               style={{ backfaceVisibility: 'hidden' }}
             >
               <p
-                className="text-6xl font-bold text-gray-800 text-center"
+                className="text-4xl sm:text-6xl font-bold text-gray-800 text-center break-words"
                 style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
               >
                 {current.chinese}
@@ -144,15 +266,15 @@ export function FlashcardsPage() {
               >
                 <Volume2 className="w-6 h-6 text-amber-700" />
               </button>
-              <p className="absolute bottom-4 text-xs text-gray-400">Click or press space to flip</p>
+              <p className="absolute bottom-4 text-xs text-gray-400 px-4 text-center">Click or press space to flip</p>
             </div>
             {/* Back - Pinyin + English */}
             <div
-              className="absolute inset-0 flex flex-col items-center justify-center p-8"
+              className="absolute inset-0 flex flex-col items-center justify-center p-6 sm:p-8"
               style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
             >
-              <p className="text-3xl font-medium text-amber-700 mb-3">{current.pinyin}</p>
-              <p className="text-2xl text-gray-700 text-center">{current.english}</p>
+              <p className="text-2xl sm:text-3xl font-medium text-amber-700 mb-3 text-center break-words">{current.pinyin}</p>
+              <p className="text-xl sm:text-2xl text-gray-700 text-center break-words">{current.english}</p>
               {current.example_sentence && (
                 <p
                   className="mt-6 text-base text-gray-500 text-center italic"
@@ -168,13 +290,23 @@ export function FlashcardsPage() {
 
         {/* Controls */}
         <div className="flex items-center justify-between">
-          <button
-            onClick={prev}
-            disabled={idx === 0}
-            className="flex items-center gap-1 px-4 py-2 rounded-xl bg-white shadow hover:shadow-md disabled:opacity-40"
-          >
-            <ChevronLeft className="w-5 h-5" /> Prev
-          </button>
+          {trackProgress ? (
+            <button
+              onClick={() => markAndAdvance('dont_know')}
+              className="flex items-center gap-1 px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium shadow"
+              title="Left arrow"
+            >
+              <X className="w-5 h-5" /> Don't know
+            </button>
+          ) : (
+            <button
+              onClick={prev}
+              disabled={idx === 0}
+              className="flex items-center gap-1 px-4 py-2 rounded-xl bg-white shadow hover:shadow-md disabled:opacity-40"
+            >
+              <ChevronLeft className="w-5 h-5" /> Prev
+            </button>
+          )}
 
           <div className="flex gap-2">
             <button
@@ -195,14 +327,30 @@ export function FlashcardsPage() {
             </button>
           </div>
 
-          <button
-            onClick={next}
-            disabled={idx === order.length - 1}
-            className="flex items-center gap-1 px-4 py-2 rounded-xl bg-white shadow hover:shadow-md disabled:opacity-40"
-          >
-            Next <ChevronRight className="w-5 h-5" />
-          </button>
+          {trackProgress ? (
+            <button
+              onClick={() => markAndAdvance('known')}
+              className="flex items-center gap-1 px-4 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium shadow"
+              title="Right arrow"
+            >
+              <Check className="w-5 h-5" /> Know
+            </button>
+          ) : (
+            <button
+              onClick={next}
+              disabled={idx === order.length - 1}
+              className="flex items-center gap-1 px-4 py-2 rounded-xl bg-white shadow hover:shadow-md disabled:opacity-40"
+            >
+              Next <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
         </div>
+
+        {trackProgress && (
+          <p className="text-center text-xs text-gray-400 mt-3">
+            Shortcuts: space = flip · ← = don't know · → = know
+          </p>
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,454 @@
+{
+  "title": "排华法案",
+  "description": null,
+  "items": [
+    {
+      "chinese": "形式",
+      "pinyin": "xíng shì",
+      "english": "form",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 0
+    },
+    {
+      "chinese": "限制",
+      "pinyin": "xiàn zhì",
+      "english": "limit",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 1
+    },
+    {
+      "chinese": "族群",
+      "pinyin": "zú qún",
+      "english": "ethnic group",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 2
+    },
+    {
+      "chinese": "移民",
+      "pinyin": "yí mín",
+      "english": "migrant",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 3
+    },
+    {
+      "chinese": "群体",
+      "pinyin": "qún tǐ",
+      "english": "group",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 4
+    },
+    {
+      "chinese": "产生",
+      "pinyin": "chǎn shēng",
+      "english": "produce",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 5
+    },
+    {
+      "chinese": "签署",
+      "pinyin": "qiān shǔ",
+      "english": "sign",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 6
+    },
+    {
+      "chinese": "淘金热",
+      "pinyin": "táo jīn rè",
+      "english": "gold rush",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 7
+    },
+    {
+      "chinese": "横贯大陆铁路",
+      "pinyin": "héng guàn dà lù tiě lù",
+      "english": "transcontinental railroad",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 8
+    },
+    {
+      "chinese": "修建",
+      "pinyin": "xiū jiàn",
+      "english": "build",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 9
+    },
+    {
+      "chinese": "贡献",
+      "pinyin": "gòng xiàn",
+      "english": "contribute",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 10
+    },
+    {
+      "chinese": "最艰苦",
+      "pinyin": "zuì jiān kǔ",
+      "english": "The most difficult",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 11
+    },
+    {
+      "chinese": "最危险",
+      "pinyin": "zuì wēi xiǎn",
+      "english": "most dangerous",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 12
+    },
+    {
+      "chinese": "收入最低",
+      "pinyin": "shōu rù zuì dī",
+      "english": "lowest income",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 13
+    },
+    {
+      "chinese": "障碍",
+      "pinyin": "zhàng ài",
+      "english": "obstacle",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 14
+    },
+    {
+      "chinese": "差异",
+      "pinyin": "chā yì",
+      "english": "difference",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 15
+    },
+    {
+      "chinese": "经济状况",
+      "pinyin": "jīng jì zhuàng kuàng",
+      "english": "economic situation",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 16
+    },
+    {
+      "chinese": "经济危机导致失业率上升",
+      "pinyin": "jīng jì wēi jī dǎo zhì shī yè shuài shàng shēng",
+      "english": "Economic crisis leads to rising unemployment",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 17
+    },
+    {
+      "chinese": "将就业压力怪罪于华人劳工",
+      "pinyin": "jiāng jiù yè yā lì guài zuì yú huá rén láo gōng",
+      "english": "Blaming Chinese workers for employment pressure",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 18
+    },
+    {
+      "chinese": "反华组织",
+      "pinyin": "fǎn huá zǔ zhī",
+      "english": "anti-China organization",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 19
+    },
+    {
+      "chinese": "不断鼓动反华言论",
+      "pinyin": "bù duàn gǔ dòng fǎn huá yán lùn",
+      "english": "Continuously instigating anti-China rhetoric",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 20
+    },
+    {
+      "chinese": "广泛的社会偏见与敌意",
+      "pinyin": "guǎng fàn de shè huì piān jiàn yǔ dí yì",
+      "english": "widespread social prejudice and hostility",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 21
+    },
+    {
+      "chinese": "正式出台",
+      "pinyin": "zhèng shì chū tái",
+      "english": "Officially introduced",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 22
+    },
+    {
+      "chinese": "禁止",
+      "pinyin": "jìn zhǐ",
+      "english": "prohibit",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 23
+    },
+    {
+      "chinese": "内",
+      "pinyin": "nèi",
+      "english": "Inside",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 24
+    },
+    {
+      "chinese": "已经",
+      "pinyin": "yǐ jīng",
+      "english": "already",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 25
+    },
+    {
+      "chinese": "离境",
+      "pinyin": "lí jìng",
+      "english": "Departure",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 26
+    },
+    {
+      "chinese": "将很难再次回来",
+      "pinyin": "jiāng hěn nán zài cì huí lái",
+      "english": "It will be difficult to come back again",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 27
+    },
+    {
+      "chinese": "剥夺",
+      "pinyin": "bō duó",
+      "english": "deprivation",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 28
+    },
+    {
+      "chinese": "权利",
+      "pinyin": "quán lì",
+      "english": "right",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 29
+    },
+    {
+      "chinese": "使",
+      "pinyin": "shǐ",
+      "english": "make",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 30
+    },
+    {
+      "chinese": "状态",
+      "pinyin": "zhuàng tài",
+      "english": "state",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 31
+    },
+    {
+      "chinese": "强化相关政策",
+      "pinyin": "qiáng huà xiāng guān zhèng cè",
+      "english": "Strengthen relevant policies",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 32
+    },
+    {
+      "chinese": "延长",
+      "pinyin": "yán cháng",
+      "english": "extend",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 33
+    },
+    {
+      "chinese": "随身带着身份证明文件",
+      "pinyin": "suí shēn dài zháo shēn fèn zhèng míng wén jiàn",
+      "english": "Carry identification documents with you",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 34
+    },
+    {
+      "chinese": "逐出境",
+      "pinyin": "zhú chū jìng",
+      "english": "deportation",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 35
+    },
+    {
+      "chinese": "加剧了对华人的控制与歧视",
+      "pinyin": "jiā jù le duì huá rén de kòng zhì yǔ qí shì",
+      "english": "Intensified control and discrimination against Chinese people",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 36
+    },
+    {
+      "chinese": "遭遇",
+      "pinyin": "zāo yù",
+      "english": "encounter",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 37
+    },
+    {
+      "chinese": "例如",
+      "pinyin": "lì rú",
+      "english": "For example",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 38
+    },
+    {
+      "chinese": "逃离",
+      "pinyin": "táo lí",
+      "english": "get away",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 39
+    },
+    {
+      "chinese": "仍然",
+      "pinyin": "réng rán",
+      "english": "still",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 40
+    },
+    {
+      "chinese": "努力生存和发展",
+      "pinyin": "nǔ lì shēng cún hé fā zhǎn",
+      "english": "strive to survive and thrive",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 41
+    },
+    {
+      "chinese": "建立",
+      "pinyin": "jiàn lì",
+      "english": "Establish",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 42
+    },
+    {
+      "chinese": "唐人街",
+      "pinyin": "táng rén jiē",
+      "english": "Chinatown",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 43
+    },
+    {
+      "chinese": "互相帮助",
+      "pinyin": "hù xiāng bāng zhù",
+      "english": "help each other",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 44
+    },
+    {
+      "chinese": "诉讼",
+      "pinyin": "sù sòng",
+      "english": "litigation",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 45
+    },
+    {
+      "chinese": "正式废除",
+      "pinyin": "zhèng shì fèi chú",
+      "english": "formally abolished",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 46
+    },
+    {
+      "chinese": "允许",
+      "pinyin": "yǔn xǔ",
+      "english": "allow",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 47
+    },
+    {
+      "chinese": "有限",
+      "pinyin": "yǒu xiàn",
+      "english": "limited",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 48
+    },
+    {
+      "chinese": "移民法改革",
+      "pinyin": "yí mín fǎ gǎi gé",
+      "english": "immigration law reform",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 49
+    },
+    {
+      "chinese": "正式通过决议",
+      "pinyin": "zhèng shì tōng guò jué yì",
+      "english": "formally adopted resolution",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 50
+    },
+    {
+      "chinese": "表示遗憾和道歉",
+      "pinyin": "biǎo shì yí hàn hé dào qiàn",
+      "english": "express regret and apologize",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 51
+    },
+    {
+      "chinese": "经济压力和社会变化时",
+      "pinyin": "jīng jì yā lì hé shè huì biàn huà shí",
+      "english": "Economic pressure and social changes",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 52
+    },
+    {
+      "chinese": "偏见和歧视",
+      "pinyin": "piān jiàn hé qí shì",
+      "english": "prejudice and discrimination",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 53
+    },
+    {
+      "chinese": "往往会通过制度化的方式表现出来",
+      "pinyin": "wǎng wǎng huì tōng guò zhì dù huà de fāng shì biǎo xiàn chū lái",
+      "english": "Often manifested through institutionalized means",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 54
+    },
+    {
+      "chinese": "造成长期影响",
+      "pinyin": "zào chéng cháng qī yǐng xiǎng",
+      "english": "cause long term effects",
+      "example_sentence": null,
+      "emoji": null,
+      "position": 55
+    }
+  ]
+}

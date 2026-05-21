@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDatabase } from './db.js';
+import { seedInitialData } from './seed.js';
 import articlesRouter from './routes/articles.js';
 import vocabularyRouter from './routes/vocabulary.js';
 import authRouter from './routes/auth.js';
@@ -31,6 +32,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // Initialize database
 initDatabase();
+seedInitialData();
 
 // API Routes
 app.use('/api/articles', articlesRouter);
