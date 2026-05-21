@@ -127,22 +127,21 @@ export function FlashcardsPage() {
     }
   };
 
-  const KNOWN_MESSAGES = ['Nice! ✨', 'Got it! 🎯', 'Yes! 💯', 'Locked in 🔒', '👏 Solid'];
-  const STREAK_MESSAGES = ['🔥 On fire!', '🚀 Streak!', '💪 Crushing it!', '⚡ Unstoppable!'];
-  const KIND_MESSAGES = ["That's how we learn 🌱", "We'll come back 💪", 'Brain growing 🧠', '📚 Repetition wins', 'Worth another look 👀'];
+  const KNOWN_STREAK_MILESTONES = [3, 5, 10, 15, 20];
+  const STREAK_MESSAGES: Record<number, string> = {
+    3: '🔥 3 in a row!',
+    5: '🚀 5 streak!',
+    10: '⚡ 10 in a row — unstoppable!',
+    15: '💎 15 streak!',
+    20: '🏆 20 in a row!!',
+  };
 
   const showEncouragement = (status: 'known' | 'dont_know', s: number) => {
-    let text: string;
-    let tone: 'good' | 'kind' | 'wow';
-    if (status === 'known') {
-      if (s >= 5) { text = `${STREAK_MESSAGES[Math.floor(Math.random() * STREAK_MESSAGES.length)]} ${s} in a row!`; tone = 'wow'; }
-      else if (s >= 3) { text = `🔥 ${s} in a row!`; tone = 'wow'; }
-      else { text = KNOWN_MESSAGES[Math.floor(Math.random() * KNOWN_MESSAGES.length)]; tone = 'good'; }
-    } else {
-      text = KIND_MESSAGES[Math.floor(Math.random() * KIND_MESSAGES.length)];
-      tone = 'kind';
+    // Stats-based only: streak milestones for "known". Nothing on "don't know".
+    if (status !== 'known') return;
+    if (KNOWN_STREAK_MILESTONES.includes(s)) {
+      showToast(STREAK_MESSAGES[s], 'wow', 1800);
     }
-    showToast(text, tone, 1600);
   };
 
   const showToast = (text: string, tone: 'good' | 'kind' | 'wow', ms: number) => {
@@ -299,9 +298,16 @@ export function FlashcardsPage() {
           <ArrowLeft className="w-4 h-4" /> Back to set
         </button>
 
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-amber-800">{set.title}</h1>
-          <span className="text-sm text-gray-600 font-medium">{progress}</span>
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <h1 className="text-2xl font-bold text-amber-800 truncate">{set.title}</h1>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {trackProgress && streak >= 3 && (
+              <span className="flex items-center gap-1 text-orange-600 font-semibold bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full text-xs animate-pulse">
+                🔥 {streak} streak
+              </span>
+            )}
+            <span className="text-sm text-gray-600 font-medium">{progress}</span>
+          </div>
         </div>
 
         {/* Track Progress toggle + stats */}
@@ -319,12 +325,7 @@ export function FlashcardsPage() {
             Track Progress {trackProgress ? 'ON' : 'OFF'}
           </button>
           {trackProgress && (
-            <div className="flex items-center gap-3 text-sm flex-wrap">
-              {streak >= 3 && (
-                <span className="flex items-center gap-1 text-orange-600 font-semibold bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full text-xs animate-pulse">
-                  🔥 {streak} streak
-                </span>
-              )}
+            <div className="flex items-center gap-3 text-sm">
               <span className="flex items-center gap-1 text-green-700">
                 <Check className="w-4 h-4" /> {knownCount}
               </span>
