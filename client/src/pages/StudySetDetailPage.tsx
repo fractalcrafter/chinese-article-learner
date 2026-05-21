@@ -22,8 +22,6 @@ export function StudySetDetailPage() {
   const [rawAdd, setRawAdd] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editChinese, setEditChinese] = useState('');
-  const [editPinyin, setEditPinyin] = useState('');
-  const [editEnglish, setEditEnglish] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
   const { speak } = useSpeechSynthesis();
 
@@ -69,30 +67,23 @@ export function StudySetDetailPage() {
   const startEdit = (item: StudySetItem) => {
     setEditingId(item.id);
     setEditChinese(item.chinese);
-    setEditPinyin(item.pinyin || '');
-    setEditEnglish(item.english || '');
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditChinese('');
-    setEditPinyin('');
-    setEditEnglish('');
   };
 
   const saveEdit = async () => {
     if (editingId === null) return;
-    if (!editChinese.trim()) {
+    const trimmed = editChinese.trim();
+    if (!trimmed) {
       alert('Chinese text is required');
       return;
     }
     setSavingEdit(true);
     try {
-      const updated = await updateVocabularyItem(editingId, {
-        chinese: editChinese.trim(),
-        pinyin: editPinyin.trim(),
-        english: editEnglish.trim(),
-      });
+      const updated = await updateVocabularyItem(editingId, { chinese: trimmed });
       setSet(s => s ? {
         ...s,
         items: s.items.map(i =>
@@ -212,34 +203,20 @@ export function StudySetDetailPage() {
               {set.items.map(item => (
                 editingId === item.id ? (
                   <div key={item.id} className="p-3 bg-blue-50 border-2 border-blue-200 rounded-xl space-y-2">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Chinese</label>
-                      <input
-                        value={editChinese}
-                        onChange={(e) => setEditChinese(e.target.value)}
-                        className="w-full px-3 py-2 text-lg rounded-lg border-2 border-amber-200 focus:border-amber-400 focus:outline-none"
-                        style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-0.5">Pinyin</label>
-                        <input
-                          value={editPinyin}
-                          onChange={(e) => setEditPinyin(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border-2 border-amber-200 focus:border-amber-400 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-0.5">English</label>
-                        <input
-                          value={editEnglish}
-                          onChange={(e) => setEditEnglish(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border-2 border-amber-200 focus:border-amber-400 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-1">
+                    <label className="block text-xs text-gray-500">Chinese (pinyin & English will be regenerated)</label>
+                    <input
+                      value={editChinese}
+                      onChange={(e) => setEditChinese(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveEdit();
+                        if (e.key === 'Escape') cancelEdit();
+                      }}
+                      autoFocus
+                      disabled={savingEdit}
+                      className="w-full px-3 py-2 text-xl rounded-lg border-2 border-amber-200 focus:border-amber-400 focus:outline-none"
+                      style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                    />
+                    <div className="flex justify-end gap-2">
                       <button
                         onClick={cancelEdit}
                         disabled={savingEdit}

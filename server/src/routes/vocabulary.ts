@@ -30,24 +30,45 @@ router.get('/:id', (req, res) => {
 });
 
 // Update vocabulary item
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { chinese, pinyin, english, example_sentence, emoji } = req.body;
     const id = parseInt(req.params.id);
 
     if (typeof chinese === 'string' && chinese.trim()) {
       const trimmed = chinese.trim();
-      const conflict = db.prepare(
-        'SELECT id FROM vocabulary WHERE chinese = ? AND id != ?'
-      ).get(trimmed, id) as any;
-      if (conflict) {
-        return res.status(409).json({ error: 'Another term with this Chinese text already exists' });
+      const existing = db.prepare('SELECT chinese FROM vocabulary WHERE id = ?').get(id) as any;
+      if (!existing) {
+        return res.status(404).json({ error: 'Vocabulary not found' });
       }
-      db.prepare('UPDATE vocabulary SET chinese = ? WHERE id = ?').run(trimmed, id);
+
+      if (trimmed !== existing.chinese) {
+        const conflict = db.prepare(
+          'SELECT id FROM vocabulary WHERE chinese = ? AND id != ?'
+        ).get(trimmed, id) as any;
+        if (conflict) {
+          return res.status(409).json({ error: 'Another term with this Chinese text already exists' });
+        }
+
+        const newPinyin = getPinyin(trimmed);
+        let newEnglish = '';
+        try {
+          newEnglish = await translateText(trimmed);
+        } catch (e) {
+          console.error('Translation failed during edit:', e);
+        }
+
+        db.prepare(
+          'UPDATE vocabulary SET chinese = ?, pinyin = ?, english = ? WHERE id = ?'
+        ).run(trimmed, newPinyin, newEnglish, id);
+
+        const refreshed = db.prepare('SELECT * FROM vocabulary WHERE id = ?').get(id);
+        return res.json(refreshed);
+      }
     }
 
     updateVocabulary(id, { pinyin, english, example_sentence, emoji });
-    
+
     const updated = db.prepare('SELECT * FROM vocabulary WHERE id = ?').get(id);
     res.json(updated);
   } catch (error) {
