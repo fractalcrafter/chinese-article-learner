@@ -20,10 +20,15 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174')
   .split(',')
-  .map(s => s.trim());
+  .map(s => s.trim())
+  .filter(Boolean);
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow same-origin / non-browser (no Origin header), explicit allowlist,
+    // and any Azure Web Apps origin (covers monkeymonkey.azurewebsites.net etc.)
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    if (/^https?:\/\/[^/]+\.azurewebsites\.net$/.test(origin)) return cb(null, true);
     return cb(null, false);
   },
   credentials: true
