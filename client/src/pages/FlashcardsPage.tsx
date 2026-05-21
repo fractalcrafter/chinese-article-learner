@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Volume2, Shuffle, ChevronLeft, ChevronRight,
-  RotateCcw, Check, X, Target,
+  RotateCcw, Check, X, Target, Brain,
 } from 'lucide-react';
 import { getStudySet, type StudySet, type StudySetItem } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
@@ -368,14 +368,27 @@ export function FlashcardsPage() {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center flex-wrap">
               {dontKnowCount > 0 && (
-                <button
-                  onClick={studyDontKnows}
-                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-semibold shadow-lg"
-                >
-                  <Target className="w-5 h-5" /> Study {dontKnowCount} I don't know
-                </button>
+                <>
+                  <button
+                    onClick={studyDontKnows}
+                    className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-semibold shadow-lg"
+                  >
+                    <Target className="w-5 h-5" /> Study {dontKnowCount} I don't know
+                  </button>
+                  <button
+                    onClick={() => {
+                      const ids = order.filter(it => statuses[it.id] === 'dont_know').map(it => it.id);
+                      navigate(`/sets/${setId}/learn`, {
+                        state: { subsetIds: ids, subsetLabel: `${ids.length} to learn` },
+                      });
+                    }}
+                    className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold shadow-lg"
+                  >
+                    <Brain className="w-5 h-5" /> Learn {dontKnowCount} I don't know
+                  </button>
+                </>
               )}
               <button
                 onClick={restartWholeSet}

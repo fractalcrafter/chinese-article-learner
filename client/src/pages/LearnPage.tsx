@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Volume2, Check, X, Trophy, RotateCcw, ArrowRight,
 } from 'lucide-react';
@@ -31,6 +31,9 @@ function buildQuestion(item: StudySetItem, allItems: StudySetItem[]): Question {
 export function LearnPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const subsetIds: number[] | undefined = (location.state as any)?.subsetIds;
+  const subsetLabel: string | undefined = (location.state as any)?.subsetLabel;
   const setId = id ? parseInt(id) : 0;
   const [set, setSet] = useState<StudySet | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +52,15 @@ export function LearnPage() {
 
   const { speak } = useSpeechSynthesis();
 
-  const allItems = useMemo(() => set?.items ?? [], [set]);
+  // If a subsetIds was passed via navigation state, restrict the learning pool to those.
+  const subsetIdSet = useMemo(
+    () => (subsetIds && subsetIds.length > 0 ? new Set(subsetIds) : null),
+    [subsetIds]
+  );
+  const allItems = useMemo(() => {
+    if (!set) return [];
+    return subsetIdSet ? set.items.filter(i => subsetIdSet.has(i.id)) : set.items;
+  }, [set, subsetIdSet]);
   const total = allItems.length;
   const masteredCount = masteredIds.size;
 
@@ -66,8 +77,8 @@ export function LearnPage() {
 
   // ============ Round init ============
   const startRound = (mastered: Set<number>, roundNum: number) => {
-    if (!set) return;
-    const remaining = set.items.filter(i => !mastered.has(i.id));
+    if (!set || allItems.length === 0) return;
+    const remaining = allItems.filter(i => !mastered.has(i.id));
     if (remaining.length === 0) {
       setPhase('done');
       return;
@@ -79,16 +90,16 @@ export function LearnPage() {
     setFeedback(null);
     setRoundNumber(roundNum);
     setPhase('question');
-    setQuestion(buildQuestion(next[0], set.items));
+    setQuestion(buildQuestion(next[0], allItems));
   };
 
   // Auto-start first round when set loads
   useEffect(() => {
-    if (set && phase === 'question' && !question && roundItems.length === 0) {
+    if (set && phase === 'question' && !question && roundItems.length === 0 && allItems.length > 0) {
       startRound(new Set(), 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [set]);
+  }, [set, allItems.length]);
 
   // ============ Answer handling ============
   const handleAnswer = (chosen: StudySetItem) => {
@@ -137,7 +148,7 @@ export function LearnPage() {
       if (newQueue.length > 1 && nextItem.id === currentItem.id) {
         nextItem = newQueue[1];
       }
-      setQuestion(buildQuestion(nextItem, set.items));
+      setQuestion(buildQuestion(nextItem, allItems));
     }
   };
 
@@ -208,7 +219,14 @@ export function LearnPage() {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold text-amber-800">{set.title}</h1>
+          <h1 className="text-2xl font-bold text-amber-800 truncate">
+            {set.title}
+            {subsetIdSet && (
+              <span className="ml-2 text-xs font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full align-middle">
+                {subsetLabel ?? `${total} subset`}
+              </span>
+            )}
+          </h1>
           <span className="text-sm text-gray-600 font-medium">
             {masteredCount} / {total} mastered
           </span>
