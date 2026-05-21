@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Layers, BookOpen, Brain, Trash2, Plus, Volume2, Pencil, Check, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Layers, BookOpen, Brain, Trash2, Plus, Volume2, Pencil, Check, X, Eye, EyeOff } from 'lucide-react';
 import {
   getStudySet,
   addStudySetItems,
@@ -10,6 +10,23 @@ import {
   type StudySetItem,
 } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
+
+const HIDDEN_KEY = (setId: number) => `monkey_hidden_${setId}`;
+
+function loadHidden(setId: number): Set<number> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEY(setId));
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return new Set(arr.filter(n => typeof n === 'number'));
+  } catch {}
+  return new Set();
+}
+function saveHidden(setId: number, hidden: Set<number>) {
+  try {
+    localStorage.setItem(HIDDEN_KEY(setId), JSON.stringify([...hidden]));
+  } catch {}
+}
 
 export function StudySetDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,7 +43,46 @@ export function StudySetDetailPage() {
   const [inlineAddAfterId, setInlineAddAfterId] = useState<number | null>(null);
   const [inlineAddValue, setInlineAddValue] = useState('');
   const [addingInline, setAddingInline] = useState(false);
+  const [hidden, setHidden] = useState<Set<number>>(new Set());
   const { speak } = useSpeechSynthesis();
+
+  useEffect(() => { if (setId) setHidden(loadHidden(setId)); }, [setId]);
+
+  const visibleCount = useMemo(
+    () => set ? set.items.filter(i => !hidden.has(i.id)).length : 0,
+    [set, hidden]
+  );
+  const visibleIds = useMemo(
+    () => set ? set.items.filter(i => !hidden.has(i.id)).map(i => i.id) : [],
+    [set, hidden]
+  );
+
+  const toggleHidden = (vocabId: number) => {
+    setHidden(prev => {
+      const next = new Set(prev);
+      if (next.has(vocabId)) next.delete(vocabId); else next.add(vocabId);
+      saveHidden(setId, next);
+      return next;
+    });
+  };
+  const showAll = () => {
+    const empty = new Set<number>();
+    setHidden(empty);
+    saveHidden(setId, empty);
+  };
+
+  const launchFlashcards = () => {
+    const allVisible = hidden.size === 0;
+    navigate(`/sets/${setId}/flashcards`, allVisible ? undefined : {
+      state: { subsetIds: visibleIds },
+    });
+  };
+  const launchLearn = () => {
+    const allVisible = hidden.size === 0;
+    navigate(`/sets/${setId}/learn`, allVisible ? undefined : {
+      state: { subsetIds: visibleIds, subsetLabel: `${visibleIds.length} selected` },
+    });
+  };
 
   const load = async () => {
     setLoading(true);
@@ -150,7 +206,7 @@ export function StudySetDetailPage() {
     );
   }
 
-  const hasItems = set.items.length > 0;
+  // hasItems no longer used (replaced by visibleCount > 0 on launch buttons)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50">
@@ -167,37 +223,61 @@ export function StudySetDetailPage() {
             <Layers className="w-8 h-8 text-amber-600 mt-1" />
             <div>
               <h1 className="text-3xl font-bold text-gray-800">{set.title}</h1>
-              <p className="text-gray-500">{set.items.length} {set.items.length === 1 ? 'term' : 'terms'}</p>
+              <p className="text-gray-500">
+                {hidden.size > 0
+                  ? <>
+                      <span className="font-semibold text-amber-700">{visibleCount}</span> of {set.items.length} {set.items.length === 1 ? 'term' : 'terms'} selected
+                    </>
+                  : <>{set.items.length} {set.items.length === 1 ? 'term' : 'terms'}</>}
+              </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
             <button
-              disabled={!hasItems}
-              onClick={() => navigate(`/sets/${setId}/flashcards`)}
+              disabled={visibleCount === 0}
+              onClick={launchFlashcards}
               className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-lg disabled:opacity-50"
             >
-              <BookOpen className="w-5 h-5" /> Flashcards
+              <BookOpen className="w-5 h-5" /> Flashcards {hidden.size > 0 ? `(${visibleCount})` : ''}
             </button>
             <button
-              disabled={!hasItems}
-              onClick={() => navigate(`/sets/${setId}/learn`)}
+              disabled={visibleCount === 0}
+              onClick={launchLearn}
               className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-semibold shadow-lg disabled:opacity-50"
             >
-              <Brain className="w-5 h-5" /> Learn
+              <Brain className="w-5 h-5" /> Learn {hidden.size > 0 ? `(${visibleCount})` : ''}
             </button>
           </div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800">Terms</h3>
-            <button
-              onClick={() => setShowAdd(s => !s)}
-              className="flex items-center gap-1 px-3 py-1 text-sm rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700"
-            >
-              <Plus className="w-4 h-4" /> Add
-            </button>
+          <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+            <h3 className="font-semibold text-gray-800">
+              Terms
+              {hidden.size > 0 && (
+                <span className="ml-2 text-xs font-medium text-gray-500">
+                  ({hidden.size} hidden)
+                </span>
+              )}
+            </h3>
+            <div className="flex items-center gap-2">
+              {hidden.size > 0 && (
+                <button
+                  onClick={showAll}
+                  className="flex items-center gap-1 px-3 py-1 text-sm rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium"
+                  title="Unhide every term"
+                >
+                  <Eye className="w-4 h-4" /> Show all
+                </button>
+              )}
+              <button
+                onClick={() => setShowAdd(s => !s)}
+                className="flex items-center gap-1 px-3 py-1 text-sm rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700"
+              >
+                <Plus className="w-4 h-4" /> Add
+              </button>
+            </div>
           </div>
 
           {showAdd && (
@@ -278,7 +358,9 @@ export function StudySetDetailPage() {
                   </div>
                 ) : (
                   <div key={item.id}>
-                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl group">
+                  <div className={`flex items-center gap-3 p-3 rounded-xl group transition-opacity ${
+                    hidden.has(item.id) ? 'bg-gray-100 opacity-50' : 'bg-amber-50'
+                  }`}>
                     <div className="flex-1 min-w-0">
                       <p className="text-xl font-medium text-gray-800 break-words" style={{ fontFamily: '"Noto Sans SC", sans-serif' }}>
                         {item.chinese}
@@ -286,6 +368,17 @@ export function StudySetDetailPage() {
                       <p className="text-sm text-amber-700 break-words">{item.pinyin}</p>
                       <p className="text-sm text-gray-600 break-words">{item.english}</p>
                     </div>
+                    <button
+                      onClick={() => toggleHidden(item.id)}
+                      className={`p-2 rounded-full transition-all ${
+                        hidden.has(item.id)
+                          ? 'text-gray-400 hover:text-gray-600'
+                          : 'text-amber-700 hover:bg-amber-200'
+                      }`}
+                      title={hidden.has(item.id) ? 'Show in study sessions' : 'Hide from study sessions'}
+                    >
+                      {hidden.has(item.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                     <button
                       onClick={() => speak(item.chinese)}
                       className="p-2 text-amber-700 hover:bg-amber-200 rounded-full"
