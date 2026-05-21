@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Volume2, Shuffle, ChevronLeft, ChevronRight,
@@ -30,7 +30,16 @@ export function FlashcardsPage() {
   const [isShuffled, setIsShuffled] = useState(false);
   const [trackProgress, setTrackProgress] = useState(false);
   const [statuses, setStatuses] = useState<Record<number, Status>>({});
+  const [dragX, setDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
+  const swipedRef = useRef(false);
   const { speak } = useSpeechSynthesis();
+
+  // Swipe thresholds (px)
+  const SWIPE_DISTANCE = 60;
+  const SWIPE_MAX_VERTICAL = 60;
+  const TAP_MAX_MOVE = 8;
 
   useEffect(() => {
     (async () => {
@@ -102,6 +111,54 @@ export function FlashcardsPage() {
     setStatuses({});
     setIdx(0);
     setFlipped(false);
+  };
+
+  // Touch swipe handlers (iOS + Android). Tap = flip; horizontal swipe = mark.
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+    swipedRef.current = false;
+    setIsDragging(true);
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!touchStart.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchStart.current.x;
+    const dy = t.clientY - touchStart.current.y;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > TAP_MAX_MOVE) {
+      e.preventDefault();
+      setDragX(dx);
+    }
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStart.current;
+    setIsDragging(false);
+    setDragX(0);
+    touchStart.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    if (absDx > SWIPE_DISTANCE && absDy < SWIPE_MAX_VERTICAL && absDx > absDy) {
+      swipedRef.current = true;
+      e.preventDefault();
+      if (trackProgress) {
+        markAndAdvance(dx > 0 ? 'known' : 'dont_know');
+      } else {
+        dx > 0 ? next() : prev();
+      }
+    }
+  };
+
+  const onCardClick = () => {
+    if (swipedRef.current) {
+      swipedRef.current = false;
+      return;
+    }
+    setFlipped(f => !f);
   };
 
   // Keyboard shortcuts
@@ -237,10 +294,40 @@ export function FlashcardsPage() {
 
         {/* Card */}
         <div
-          onClick={() => setFlipped(f => !f)}
-          className="relative w-full h-80 bg-white rounded-3xl shadow-xl cursor-pointer mb-6 select-none"
-          style={{ perspective: '1000px' }}
+          onClick={onCardClick}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={() => { setIsDragging(false); setDragX(0); touchStart.current = null; }}
+          className="relative w-full h-80 bg-white rounded-3xl shadow-xl cursor-pointer mb-6 select-none overflow-hidden"
+          style={{
+            perspective: '1000px',
+            touchAction: 'pan-y',
+            transform: dragX !== 0 ? `translateX(${dragX}px) rotate(${dragX * 0.05}deg)` : undefined,
+            transition: isDragging ? 'none' : 'transform 200ms ease-out',
+          }}
         >
+          {/* Swipe hint overlays (visible during drag, mainly useful when trackProgress is on) */}
+          {trackProgress && dragX > 20 && (
+            <div
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+              style={{ backgroundColor: `rgba(34,197,94,${Math.min(0.35, dragX / 400)})` }}
+            >
+              <div className="flex items-center gap-2 text-green-700 font-bold text-2xl bg-white/80 px-4 py-2 rounded-2xl shadow">
+                <Check className="w-6 h-6" /> Know
+              </div>
+            </div>
+          )}
+          {trackProgress && dragX < -20 && (
+            <div
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+              style={{ backgroundColor: `rgba(239,68,68,${Math.min(0.35, -dragX / 400)})` }}
+            >
+              <div className="flex items-center gap-2 text-red-700 font-bold text-2xl bg-white/80 px-4 py-2 rounded-2xl shadow">
+                <X className="w-6 h-6" /> Don't know
+              </div>
+            </div>
+          )}
           <div
             className="absolute inset-0 flex items-center justify-center p-8 transition-transform duration-500"
             style={{
@@ -348,7 +435,7 @@ export function FlashcardsPage() {
 
         {trackProgress && (
           <p className="text-center text-xs text-gray-400 mt-3">
-            Shortcuts: space = flip · ← = don't know · → = know
+            Shortcuts: space = flip · ← / swipe left = don't know · → / swipe right = know
           </p>
         )}
       </div>
