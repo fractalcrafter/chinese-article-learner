@@ -36,6 +36,7 @@ export function FlashcardsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [exitX, setExitX] = useState(0);
   const [enterDir, setEnterDir] = useState<null | 'left' | 'right'>(null);
+  const [carouselTarget, setCarouselTarget] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -193,22 +194,32 @@ export function FlashcardsPage() {
     e.preventDefault();
     const direction = dx > 0 ? 1 : -1;
     isAnimatingRef.current = true;
-    setExitX(direction * (window.innerWidth || 400));
-    setDragX(0);
-    window.setTimeout(() => {
-      if (trackProgress) {
-        markAndAdvance(direction > 0 ? 'known' : 'dont_know');
-      } else {
-        direction > 0 ? next() : prev();
-      }
-      // Slide the new card in from the opposite side, like swiping photos
-      setExitX(0);
-      setEnterDir(direction > 0 ? 'left' : 'right');
+
+    if (trackProgress) {
+      // ON mode: fly-off + slide-in (visual matches the "mark" action)
+      setExitX(direction * (window.innerWidth || 400));
+      setDragX(0);
       window.setTimeout(() => {
-        setEnterDir(null);
+        markAndAdvance(direction > 0 ? 'known' : 'dont_know');
+        setExitX(0);
+        setEnterDir(direction > 0 ? 'left' : 'right');
+        window.setTimeout(() => {
+          setEnterDir(null);
+          isAnimatingRef.current = false;
+        }, ENTER_DURATION);
+      }, EXIT_DURATION);
+    } else {
+      // OFF mode: photo-style carousel slide.
+      // Swipe LEFT -> advance to NEXT. Swipe RIGHT -> go to PREV.
+      const w = window.innerWidth || 400;
+      setCarouselTarget(direction * w);
+      setDragX(0);
+      window.setTimeout(() => {
+        if (direction > 0) prev(); else next();
+        setCarouselTarget(0);
         isAnimatingRef.current = false;
-      }, ENTER_DURATION);
-    }, EXIT_DURATION);
+      }, 260);
+    }
   };
 
   const onCardClick = () => {
@@ -236,6 +247,64 @@ export function FlashcardsPage() {
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.length, idx, trackProgress, current?.id]);
+
+  const renderCardFace = (item: StudySetItem, isFlipped: boolean, interactive: boolean) => (
+    <div
+      className={`relative w-full h-full bg-white rounded-3xl shadow-xl ${interactive ? 'cursor-pointer' : ''}`}
+      style={{ perspective: '1000px' }}
+    >
+      <div
+        key={item.id}
+        className="absolute inset-0 flex items-center justify-center p-8 transition-transform duration-500"
+        style={{
+          transformStyle: 'preserve-3d',
+          transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+        }}
+      >
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center p-6 sm:p-8"
+          style={{ backfaceVisibility: 'hidden' }}
+        >
+          <p
+            className="text-6xl sm:text-7xl font-bold text-gray-800 text-center break-words leading-tight"
+            style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+          >
+            {item.chinese}
+          </p>
+          {interactive && (
+            <button
+              onClick={(e) => { e.stopPropagation(); speak(item.chinese); }}
+              className="mt-6 p-3 bg-amber-100 hover:bg-amber-200 rounded-full"
+              title="Listen"
+            >
+              <Volume2 className="w-6 h-6 text-amber-700" />
+            </button>
+          )}
+          {interactive && (
+            <p className="absolute bottom-4 text-xs text-gray-400 px-4 text-center">Click or press space to flip</p>
+          )}
+        </div>
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center p-6 sm:p-8"
+          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+        >
+          <p className="text-3xl sm:text-4xl font-medium text-amber-700 mb-3 text-center break-words leading-tight">{item.pinyin}</p>
+          <p className="text-2xl sm:text-3xl text-gray-700 text-center break-words leading-tight">{item.english}</p>
+          {item.example_sentence && (
+            <p
+              className="mt-6 text-base text-gray-500 text-center italic"
+              style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+            >
+              {item.example_sentence}
+            </p>
+          )}
+          {interactive && (
+            <p className="absolute bottom-4 text-xs text-gray-400">Click or press space to flip back</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -445,7 +514,8 @@ export function FlashcardsPage() {
           </div>
         )}
 
-        {/* Card */}
+        {/* Card viewport (carousel in OFF mode, single card in ON mode) */}
+        {trackProgress ? (
         <div
           onClick={onCardClick}
           onTouchStart={onTouchStart}
@@ -475,8 +545,8 @@ export function FlashcardsPage() {
             opacity: exitX !== 0 ? 0 : 1,
           }}
         >
-          {/* Swipe hint overlays (visible during drag, mainly useful when trackProgress is on) */}
-          {trackProgress && dragX > 20 && (
+          {/* Swipe hint overlays (visible during drag) */}
+          {dragX > 20 && (
             <div
               className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
               style={{ backgroundColor: `rgba(34,197,94,${Math.min(0.35, dragX / 400)})` }}
@@ -486,7 +556,7 @@ export function FlashcardsPage() {
               </div>
             </div>
           )}
-          {trackProgress && dragX < -20 && (
+          {dragX < -20 && (
             <div
               className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
               style={{ backgroundColor: `rgba(239,68,68,${Math.min(0.35, -dragX / 400)})` }}
@@ -496,53 +566,44 @@ export function FlashcardsPage() {
               </div>
             </div>
           )}
+          {renderCardFace(current, flipped, true)}
+        </div>
+        ) : (
+        <div
+          className="relative w-full h-96 sm:h-80 mb-6 select-none overflow-hidden rounded-3xl"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={() => { setIsDragging(false); setDragX(0); touchStart.current = null; }}
+          style={{ touchAction: 'pan-y' }}
+        >
+          {/* Carousel track: prev | current | next */}
           <div
-            key={current.id}
-            className="absolute inset-0 flex items-center justify-center p-8 transition-transform duration-500"
+            className="absolute inset-0"
             style={{
-              transformStyle: 'preserve-3d',
-              transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+              transform: `translateX(${isDragging ? dragX : (carouselTarget !== 0 ? carouselTarget : 0)}px)`,
+              transition: isDragging ? 'none' : 'transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1)',
             }}
           >
-            {/* Front - Chinese */}
-            <div
-              className="absolute inset-0 flex flex-col items-center justify-center p-6 sm:p-8"
-              style={{ backfaceVisibility: 'hidden' }}
-            >
-              <p
-                className="text-6xl sm:text-7xl font-bold text-gray-800 text-center break-words leading-tight"
-                style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
-              >
-                {current.chinese}
-              </p>
-              <button
-                onClick={(e) => { e.stopPropagation(); speak(current.chinese); }}
-                className="mt-6 p-3 bg-amber-100 hover:bg-amber-200 rounded-full"
-                title="Listen"
-              >
-                <Volume2 className="w-6 h-6 text-amber-700" />
-              </button>
-              <p className="absolute bottom-4 text-xs text-gray-400 px-4 text-center">Click or press space to flip</p>
+            {/* Previous card (off-screen left) */}
+            {idx > 0 && (
+              <div className="absolute inset-0" style={{ transform: 'translateX(-100%)' }}>
+                {renderCardFace(order[idx - 1], false, false)}
+              </div>
+            )}
+            {/* Current card (centered) */}
+            <div className="absolute inset-0" onClick={onCardClick}>
+              {renderCardFace(current, flipped, true)}
             </div>
-            {/* Back - Pinyin + English */}
-            <div
-              className="absolute inset-0 flex flex-col items-center justify-center p-6 sm:p-8"
-              style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-            >
-              <p className="text-3xl sm:text-4xl font-medium text-amber-700 mb-3 text-center break-words leading-tight">{current.pinyin}</p>
-              <p className="text-2xl sm:text-3xl text-gray-700 text-center break-words leading-tight">{current.english}</p>
-              {current.example_sentence && (
-                <p
-                  className="mt-6 text-base text-gray-500 text-center italic"
-                  style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
-                >
-                  {current.example_sentence}
-                </p>
-              )}
-              <p className="absolute bottom-4 text-xs text-gray-400">Click or press space to flip back</p>
-            </div>
+            {/* Next card (off-screen right) */}
+            {idx < order.length - 1 && (
+              <div className="absolute inset-0" style={{ transform: 'translateX(100%)' }}>
+                {renderCardFace(order[idx + 1], false, false)}
+              </div>
+            )}
           </div>
         </div>
+        )}
 
         {/* Controls */}
         <div className="flex items-center justify-between">
