@@ -335,7 +335,7 @@ export function ArticlePage() {
                   value={editedText}
                   onChange={(e) => setEditedText(e.target.value)}
                   className="w-full h-48 p-4 text-xl leading-relaxed border-2 border-amber-200 rounded-xl focus:border-amber-400 focus:outline-none resize-none"
-                  style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                  style={{ fontFamily: 'var(--font-chinese)' }}
                 />
                 <div className="flex justify-between items-center mt-3">
                   <span className="text-sm text-gray-500">{editedText.length} characters</span>
@@ -425,7 +425,7 @@ export function ArticlePage() {
             ) : (
               <div className="bg-white rounded-xl p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Original Text</h2>
-                <p className="text-xl leading-relaxed" style={{ fontFamily: '"Noto Sans SC", sans-serif' }}>
+                <p className="text-xl leading-relaxed" style={{ fontFamily: 'var(--font-chinese)' }}>
                   {article.transcription_edited || article.transcription_original}
                 </p>
                 {!isProcessing && (
@@ -454,7 +454,7 @@ export function ArticlePage() {
                   onChange={(e) => setNewVocab(e.target.value)}
                   placeholder="Enter Chinese word (e.g., 学习)"
                   className="flex-1 px-4 py-2 border-2 border-amber-200 rounded-lg focus:border-amber-400 focus:outline-none text-lg"
-                  style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+                  style={{ fontFamily: 'var(--font-chinese)' }}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddVocab()}
                 />
                 <button
@@ -578,7 +578,7 @@ function SentenceCard({
           {/* Chinese with Pinyin above each character */}
           <p 
             className="font-medium text-gray-900 mb-4 leading-loose"
-            style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+            style={{ fontFamily: 'var(--font-chinese)' }}
           >
             {renderChineseWithPinyin()}
           </p>

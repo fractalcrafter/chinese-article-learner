@@ -305,7 +305,7 @@ export function LearnPage() {
                     <div className="flex-shrink-0">
                       <p
                         className="text-2xl font-bold text-gray-800"
-                        style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                        style={{ fontFamily: 'var(--font-chinese)' }}
                       >
                         {item.chinese}
                       </p>
@@ -359,7 +359,7 @@ export function LearnPage() {
               <div className="flex items-center justify-center gap-3 flex-wrap">
                 <p
                   className="text-4xl sm:text-5xl font-bold text-gray-800 break-words"
-                  style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                  style={{ fontFamily: 'var(--font-chinese)' }}
                 >
                   {question.item.chinese}
                 </p>
@@ -426,7 +426,7 @@ export function LearnPage() {
                     <p className="text-sm text-gray-700 mt-1 break-words">
                       <span
                         className="font-medium"
-                        style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+                        style={{ fontFamily: 'var(--font-chinese)' }}
                       >
                         {question.item.chinese}
                       </span>

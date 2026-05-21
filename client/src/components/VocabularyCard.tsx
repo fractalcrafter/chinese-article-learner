@@ -134,7 +134,7 @@ export function VocabularyCard({ vocabulary, onSpeak }: VocabularyCardProps) {
               <p className="text-sm text-gray-500 mb-1">Example:</p>
               <p 
                 className="text-gray-700"
-                style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+                style={{ fontFamily: 'var(--font-chinese)' }}
               >
                 {vocabulary.example_sentence}
               </p>

@@ -287,7 +287,7 @@ export function StudySetDetailPage() {
                 onChange={(e) => setRawAdd(e.target.value)}
                 placeholder="Paste more Chinese words..."
                 className="w-full h-24 p-2 border-2 border-amber-200 rounded-lg focus:border-amber-400 focus:outline-none text-lg"
-                style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                style={{ fontFamily: 'var(--font-chinese)' }}
               />
               <div className="flex justify-end gap-2 mt-2">
                 <button
@@ -327,7 +327,7 @@ export function StudySetDetailPage() {
                       autoFocus
                       disabled={savingEdit}
                       className="w-full px-3 py-2 text-xl rounded-lg border-2 border-amber-200 focus:border-amber-400 focus:outline-none"
-                      style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                      style={{ fontFamily: 'var(--font-chinese)' }}
                     />
                     <div className="flex flex-wrap justify-end gap-2">
                       <button
@@ -362,7 +362,7 @@ export function StudySetDetailPage() {
                     hidden.has(item.id) ? 'bg-gray-100 opacity-50' : 'bg-amber-50'
                   }`}>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xl font-medium text-gray-800 break-words" style={{ fontFamily: '"Noto Sans SC", sans-serif' }}>
+                      <p className="text-xl font-medium text-gray-800 break-words" style={{ fontFamily: 'var(--font-chinese)' }}>
                         {item.chinese}
                       </p>
                       <p className="text-sm text-amber-700 break-words">{item.pinyin}</p>
@@ -425,7 +425,7 @@ export function StudySetDetailPage() {
                         disabled={addingInline}
                         placeholder="Type Chinese characters…"
                         className="w-full px-3 py-2 text-xl rounded-lg border-2 border-green-200 focus:border-green-400 focus:outline-none"
-                        style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                        style={{ fontFamily: 'var(--font-chinese)' }}
                       />
                       <div className="flex flex-wrap justify-end gap-2">
                         <button

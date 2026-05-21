@@ -294,14 +294,14 @@ export function RecordPage() {
 
 Click 'Start Recording' and speak in Chinese, or type/paste text directly."
             className="w-full h-48 p-4 text-xl leading-relaxed border-2 border-gray-200 rounded-xl focus:border-amber-400 focus:outline-none resize-none"
-            style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+            style={{ fontFamily: 'var(--font-chinese)' }}
           />
           
           {/* Show interim transcript below textarea */}
           {interimTranscript && (
             <div 
               className="mt-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xl text-amber-700"
-              style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+              style={{ fontFamily: 'var(--font-chinese)' }}
             >
               <span className="animate-pulse">🎤</span> {interimTranscript}...
             </div>

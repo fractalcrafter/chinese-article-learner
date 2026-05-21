@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+:root {
+  --font-chinese: "KaiTi", "STKaiti", "AR PL UKai CN", "AR PL UKai TW", "Edukai-3", "BiauKai", "DFKai-SB", serif;
+}
+.font-chinese { font-family: var(--font-chinese); }
+
 @keyframes toastIn {
   0%   { transform: translateY(-20px) scale(0.85); opacity: 0; }
   60%  { transform: translateY(4px) scale(1.05); opacity: 1; }
