@@ -94,6 +94,23 @@ export function initDatabase() {
       last_reviewed DATETIME,
       PRIMARY KEY (user_id, vocabulary_id)
     );
+
+    -- Study sets (Quizlet-style flashcard sets)
+    CREATE TABLE IF NOT EXISTS study_sets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      created_by INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Study set <-> vocabulary junction (with position for ordering)
+    CREATE TABLE IF NOT EXISTS study_set_vocab (
+      set_id INTEGER REFERENCES study_sets(id) ON DELETE CASCADE,
+      vocabulary_id INTEGER REFERENCES vocabulary(id) ON DELETE CASCADE,
+      position INTEGER DEFAULT 0,
+      PRIMARY KEY (set_id, vocabulary_id)
+    );
   `);
 
   console.log('📚 Database initialized');
