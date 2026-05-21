@@ -296,7 +296,7 @@ export function FlashcardsPage() {
         >
           <p
             className="text-6xl sm:text-7xl font-bold text-gray-800 text-center break-words leading-tight"
-            style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+            style={{ fontFamily: 'var(--font-chinese)' }}
           >
             {item.chinese}
           </p>
@@ -322,7 +322,7 @@ export function FlashcardsPage() {
           {item.example_sentence && (
             <p
               className="mt-6 text-base text-gray-500 text-center italic"
-              style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+              style={{ fontFamily: 'var(--font-chinese)' }}
             >
               {item.example_sentence}
             </p>
@@ -469,7 +469,7 @@ export function FlashcardsPage() {
                     <div key={it.id} className="flex items-baseline gap-2 text-sm">
                       <span
                         className="font-medium text-gray-800"
-                        style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+                        style={{ fontFamily: 'var(--font-chinese)' }}
                       >
                         {it.chinese}
                       </span>

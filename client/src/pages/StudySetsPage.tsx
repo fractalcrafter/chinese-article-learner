@@ -96,7 +96,7 @@ export function StudySetsPage() {
               onChange={(e) => setRawInput(e.target.value)}
               placeholder={'你好\n谢谢\n再见\n老师'}
               className="w-full h-48 p-4 text-lg border-2 border-gray-200 rounded-xl focus:border-amber-400 focus:outline-none resize-none"
-              style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+              style={{ fontFamily: 'var(--font-chinese)' }}
             />
             <p className="text-xs text-gray-500 mt-1 mb-4">
               Pinyin and English will be generated automatically.
