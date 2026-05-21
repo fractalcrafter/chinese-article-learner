@@ -44,9 +44,22 @@ export function StudySetDetailPage() {
   const [inlineAddValue, setInlineAddValue] = useState('');
   const [addingInline, setAddingInline] = useState(false);
   const [hidden, setHidden] = useState<Set<number>>(new Set());
+  // IDs added in this session via the top "+ Add" form; rendered at the top of the list.
+  const [recentlyAddedIds, setRecentlyAddedIds] = useState<number[]>([]);
   const { speak } = useSpeechSynthesis();
 
   useEffect(() => { if (setId) setHidden(loadHidden(setId)); }, [setId]);
+
+  const orderedItems = useMemo(() => {
+    if (!set) return [] as StudySetItem[];
+    if (recentlyAddedIds.length === 0) return set.items;
+    const recentSet = new Set(recentlyAddedIds);
+    const recentItems = recentlyAddedIds
+      .map(id => set.items.find(i => i.id === id))
+      .filter((x): x is StudySetItem => !!x);
+    const rest = set.items.filter(i => !recentSet.has(i.id));
+    return [...recentItems, ...rest];
+  }, [set, recentlyAddedIds]);
 
   const visibleCount = useMemo(
     () => set ? set.items.filter(i => !hidden.has(i.id)).length : 0,
@@ -101,10 +114,15 @@ export function StudySetDetailPage() {
     if (!rawAdd.trim()) return;
     setAdding(true);
     try {
-      await addStudySetItems(setId, { rawInput: rawAdd });
+      const { added } = await addStudySetItems(setId, { rawInput: rawAdd });
       setRawAdd('');
       setShowAdd(false);
       await load();
+      if (added && added.length > 0) {
+        // Newest first; keep previously added on top of older session adds.
+        const newIds = added.map(a => a.id).reverse();
+        setRecentlyAddedIds(prev => [...newIds, ...prev.filter(id => !newIds.includes(id))]);
+      }
     } catch (e) {
       console.error(e);
       alert('Failed to add items');
@@ -313,7 +331,7 @@ export function StudySetDetailPage() {
             <p className="text-gray-500 text-center py-6">No terms yet.</p>
           ) : (
             <div className="space-y-2">
-              {set.items.map(item => (
+              {orderedItems.map(item => (
                 editingId === item.id ? (
                   <div key={item.id} className="p-3 bg-blue-50 border-2 border-blue-200 rounded-xl space-y-2">
                     <label className="block text-xs text-gray-500">Chinese (pinyin & English will be regenerated)</label>
