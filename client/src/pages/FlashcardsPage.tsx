@@ -36,6 +36,7 @@ export function FlashcardsPage() {
   const [entering, setEntering] = useState(false);
   const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
   const swipedRef = useRef(false);
+  const isAnimatingRef = useRef(false);
   const { speak } = useSpeechSynthesis();
 
   // Swipe thresholds (px)
@@ -119,6 +120,7 @@ export function FlashcardsPage() {
 
   // Touch swipe handlers (iOS + Android). Tap = flip; horizontal swipe = mark.
   const onTouchStart = (e: React.TouchEvent) => {
+    if (isAnimatingRef.current) return;
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     touchStart.current = { x: t.clientX, y: t.clientY, t: Date.now() };
@@ -126,7 +128,7 @@ export function FlashcardsPage() {
     setIsDragging(true);
   };
   const onTouchMove = (e: React.TouchEvent) => {
-    if (!touchStart.current) return;
+    if (!touchStart.current || isAnimatingRef.current) return;
     const t = e.touches[0];
     const dx = t.clientX - touchStart.current.x;
     const dy = t.clientY - touchStart.current.y;
@@ -140,7 +142,7 @@ export function FlashcardsPage() {
     setIsDragging(false);
     setDragX(0);
     touchStart.current = null;
-    if (!start) return;
+    if (!start || isAnimatingRef.current) return;
     const t = e.changedTouches[0];
     const dx = t.clientX - start.x;
     const dy = t.clientY - start.y;
@@ -150,6 +152,10 @@ export function FlashcardsPage() {
       swipedRef.current = true;
       e.preventDefault();
       const direction = dx > 0 ? 1 : -1;
+      isAnimatingRef.current = true;
+      // Flip back to the front immediately so the back side isn't revealed
+      // on the next card. The flip transition runs in parallel with the exit.
+      setFlipped(false);
       // Animate the card flying off-screen, then apply the action
       setExitX(direction * (window.innerWidth || 400));
       setTimeout(() => {
@@ -161,7 +167,10 @@ export function FlashcardsPage() {
         // Reset exit and trigger an enter animation for the new card
         setExitX(0);
         setEntering(true);
-        setTimeout(() => setEntering(false), ENTER_DURATION);
+        setTimeout(() => {
+          setEntering(false);
+          isAnimatingRef.current = false;
+        }, ENTER_DURATION);
       }, EXIT_DURATION);
     }
   };
@@ -171,6 +180,7 @@ export function FlashcardsPage() {
       swipedRef.current = false;
       return;
     }
+    if (isAnimatingRef.current) return;
     setFlipped(f => !f);
   };
 
@@ -312,7 +322,7 @@ export function FlashcardsPage() {
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
           onTouchCancel={() => { setIsDragging(false); setDragX(0); touchStart.current = null; }}
-          className="relative w-full h-80 bg-white rounded-3xl shadow-xl cursor-pointer mb-6 select-none overflow-hidden"
+          className="relative w-full h-96 sm:h-80 bg-white rounded-3xl shadow-xl cursor-pointer mb-6 select-none overflow-hidden"
           style={{
             perspective: '1000px',
             touchAction: 'pan-y',
@@ -355,6 +365,7 @@ export function FlashcardsPage() {
             </div>
           )}
           <div
+            key={current.id}
             className="absolute inset-0 flex items-center justify-center p-8 transition-transform duration-500"
             style={{
               transformStyle: 'preserve-3d',
@@ -367,7 +378,7 @@ export function FlashcardsPage() {
               style={{ backfaceVisibility: 'hidden' }}
             >
               <p
-                className="text-4xl sm:text-6xl font-bold text-gray-800 text-center break-words"
+                className="text-6xl sm:text-7xl font-bold text-gray-800 text-center break-words leading-tight"
                 style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
               >
                 {current.chinese}
@@ -386,8 +397,8 @@ export function FlashcardsPage() {
               className="absolute inset-0 flex flex-col items-center justify-center p-6 sm:p-8"
               style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
             >
-              <p className="text-2xl sm:text-3xl font-medium text-amber-700 mb-3 text-center break-words">{current.pinyin}</p>
-              <p className="text-xl sm:text-2xl text-gray-700 text-center break-words">{current.english}</p>
+              <p className="text-3xl sm:text-4xl font-medium text-amber-700 mb-3 text-center break-words leading-tight">{current.pinyin}</p>
+              <p className="text-2xl sm:text-3xl text-gray-700 text-center break-words leading-tight">{current.english}</p>
               {current.example_sentence && (
                 <p
                   className="mt-6 text-base text-gray-500 text-center italic"

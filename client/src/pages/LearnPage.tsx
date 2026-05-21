@@ -8,11 +8,8 @@ import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 
 const ROUND_SIZE = 5;
 
-type Direction = 'zh-to-en' | 'zh-to-pinyin';
-
 interface Question {
   item: StudySetItem;
-  direction: Direction;
   options: StudySetItem[]; // includes the correct item
 }
 
@@ -26,10 +23,9 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function buildQuestion(item: StudySetItem, allItems: StudySetItem[]): Question {
-  const direction: Direction = Math.random() < 0.5 ? 'zh-to-en' : 'zh-to-pinyin';
   const pool = allItems.filter(i => i.id !== item.id);
   const distractors = shuffle(pool).slice(0, Math.min(3, pool.length));
-  return { item, direction, options: shuffle([item, ...distractors]) };
+  return { item, options: shuffle([item, ...distractors]) };
 }
 
 export function LearnPage() {
@@ -337,7 +333,7 @@ export function LearnPage() {
           /* ============== QUESTION ============== */
           <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">
             <p className="text-sm text-gray-500 text-center mb-4">
-              {question.direction === 'zh-to-en' ? 'Choose the meaning' : 'Choose the pinyin'}
+              Choose the pinyin
             </p>
 
             {/* Prompt — always Chinese characters */}
@@ -378,11 +374,7 @@ export function LearnPage() {
                     className={`flex items-start gap-2 p-4 rounded-xl text-left transition-all border-2 ${cls}`}
                   >
                     <span className="text-xs text-gray-400 font-mono mt-1 flex-shrink-0">{i + 1}</span>
-                    {question.direction === 'zh-to-en' ? (
-                      <span className="text-gray-800 break-words">{opt.english}</span>
-                    ) : (
-                      <span className="text-amber-800 font-medium break-words">{opt.pinyin}</span>
-                    )}
+                    <span className="text-amber-800 font-medium break-words">{opt.pinyin}</span>
                     {feedback && isCorrect && (
                       <Check className="w-5 h-5 text-green-600 ml-auto flex-shrink-0" />
                     )}
