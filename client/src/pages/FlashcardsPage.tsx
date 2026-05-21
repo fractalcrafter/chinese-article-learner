@@ -36,12 +36,9 @@ export function FlashcardsPage() {
   const [entering, setEntering] = useState(false);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
-  const [toast, setToast] = useState<{ text: string; tone: 'good' | 'kind' | 'wow' } | null>(null);
-  const [milestonesShown, setMilestonesShown] = useState<Set<number>>(new Set());
   const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
   const swipedRef = useRef(false);
   const isAnimatingRef = useRef(false);
-  const toastTimerRef = useRef<number | null>(null);
   const { speak } = useSpeechSynthesis();
 
   // Swipe thresholds (px) — kept generous so flicks register reliably on iOS
@@ -91,33 +88,16 @@ export function FlashcardsPage() {
   };
   const markAndAdvance = (status: Exclude<Status, 'unseen'>) => {
     if (!current) return;
-    const newStatuses = { ...statuses, [current.id]: status };
-    setStatuses(newStatuses);
+    setStatuses(s => ({ ...s, [current.id]: status }));
 
-    // Streak + encouragement
-    let newStreak = streak;
+    // Streak (shown in header badge only; no toasts)
     if (status === 'known') {
-      newStreak = streak + 1;
+      const newStreak = streak + 1;
       setStreak(newStreak);
       if (newStreak > bestStreak) setBestStreak(newStreak);
-      showEncouragement('known', newStreak);
     } else {
       setStreak(0);
-      showEncouragement('dont_know', 0);
     }
-
-    // Milestone toast (25/50/75% of total — 100% is celebration screen)
-    const reviewed = Object.values(newStatuses).filter(s => s && s !== 'unseen').length;
-    const pct = Math.floor((reviewed / order.length) * 100);
-    [25, 50, 75].forEach(m => {
-      if (pct >= m && !milestonesShown.has(m)) {
-        setMilestonesShown(prev => new Set(prev).add(m));
-        const msg = m === 25 ? '🌱 25% — great start!'
-          : m === 50 ? '⛰️ Halfway there!'
-          : '🎯 75% — almost done!';
-        showToast(msg, 'wow', 2200);
-      }
-    });
 
     if (idx < order.length - 1) {
       setFlipped(false);
@@ -125,29 +105,6 @@ export function FlashcardsPage() {
     } else {
       setFlipped(false);
     }
-  };
-
-  const KNOWN_STREAK_MILESTONES = [3, 5, 10, 15, 20];
-  const STREAK_MESSAGES: Record<number, string> = {
-    3: '🔥 3 in a row!',
-    5: '🚀 5 streak!',
-    10: '⚡ 10 in a row — unstoppable!',
-    15: '💎 15 streak!',
-    20: '🏆 20 in a row!!',
-  };
-
-  const showEncouragement = (status: 'known' | 'dont_know', s: number) => {
-    // Stats-based only: streak milestones for "known". Nothing on "don't know".
-    if (status !== 'known') return;
-    if (KNOWN_STREAK_MILESTONES.includes(s)) {
-      showToast(STREAK_MESSAGES[s], 'wow', 1800);
-    }
-  };
-
-  const showToast = (text: string, tone: 'good' | 'kind' | 'wow', ms: number) => {
-    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-    setToast({ text, tone });
-    toastTimerRef.current = window.setTimeout(() => setToast(null), ms);
   };
   const toggleShuffle = () => {
     if (isShuffled && set) {
@@ -167,8 +124,6 @@ export function FlashcardsPage() {
     setFlipped(false);
     setStreak(0);
     setBestStreak(0);
-    setMilestonesShown(new Set());
-    setToast(null);
   };
   const restartWholeSet = () => {
     if (set) setOrder(isShuffled ? shuffle(set.items) : set.items);
@@ -630,24 +585,6 @@ export function FlashcardsPage() {
         </>
         )}
       </div>
-
-      {/* Floating encouragement toast */}
-      {toast && (
-        <div className="fixed inset-x-0 top-20 flex justify-center pointer-events-none z-50 px-4">
-          <div
-            className={`px-4 py-2 rounded-full shadow-xl text-white font-semibold text-sm transition-all duration-200 ${
-              toast.tone === 'wow'
-                ? 'bg-gradient-to-r from-orange-500 to-pink-500'
-                : toast.tone === 'kind'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-500'
-                  : 'bg-gradient-to-r from-green-500 to-emerald-500'
-            }`}
-            style={{ animation: 'toastIn 0.25s ease-out' }}
-          >
-            {toast.text}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
