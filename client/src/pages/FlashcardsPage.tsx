@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Volume2, Shuffle, ChevronLeft, ChevronRight,
   RotateCcw, Check, X, Target, Brain,
@@ -21,6 +21,8 @@ function shuffle<T>(arr: T[]): T[] {
 export function FlashcardsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const subsetIds: number[] | undefined = (location.state as any)?.subsetIds;
   const setId = id ? parseInt(id) : 0;
   const [set, setSet] = useState<StudySet | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,10 @@ export function FlashcardsPage() {
       try {
         const s = await getStudySet(setId);
         setSet(s);
-        setOrder(s.items);
+        const items = subsetIds && subsetIds.length > 0
+          ? s.items.filter(i => subsetIds.includes(i.id))
+          : s.items;
+        setOrder(items);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     })();
@@ -106,9 +111,16 @@ export function FlashcardsPage() {
       setFlipped(false);
     }
   };
+  const baseItems = useMemo(() => {
+    if (!set) return [];
+    return subsetIds && subsetIds.length > 0
+      ? set.items.filter(i => subsetIds.includes(i.id))
+      : set.items;
+  }, [set, subsetIds]);
+
   const toggleShuffle = () => {
-    if (isShuffled && set) {
-      setOrder(set.items);
+    if (isShuffled) {
+      setOrder(baseItems);
       setIsShuffled(false);
     } else {
       setOrder(shuffle(order));
@@ -126,7 +138,7 @@ export function FlashcardsPage() {
     setBestStreak(0);
   };
   const restartWholeSet = () => {
-    if (set) setOrder(isShuffled ? shuffle(set.items) : set.items);
+    setOrder(isShuffled ? shuffle(baseItems) : baseItems);
     resetProgress();
   };
   const studyDontKnows = () => {
