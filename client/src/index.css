@@ -1,14 +1,8 @@
 @import "tailwindcss";
 
 :root {
-<<<<<<< HEAD
   --font-chinese: "LXGW WenKai Screen", "LXGW WenKai", "Kaiti SC", "STKaiti", "KaiTi",
                   "BiauKai", "DFKai-SB", "AR PL UKai CN", serif;
-=======
-  --font-chinese: "Kaiti SC", "KaiTi SC", "STKaiti", "KaiTi", "BiauKai", "DFKai-SB",
-                  "AR PL UKai CN", "AR PL UKai TW", "AR PL UKai HK", "Edukai-3",
-                  "Noto Serif SC", "ZCOOL KuaiLe", "Songti SC", "SimSun", serif;
->>>>>>> origin/master
 }
 .font-chinese { font-family: var(--font-chinese); }
 
