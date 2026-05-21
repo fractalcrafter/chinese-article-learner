@@ -313,3 +313,16 @@ export async function removeStudySetItem(setId: number, vocabId: number): Promis
   const r = await fetch(`${API_BASE}/sets/${setId}/items/${vocabId}`, { method: 'DELETE' });
   if (!r.ok) throw new Error('Failed to remove item');
 }
+
+export async function updateVocabularyItem(
+  vocabId: number,
+  data: { chinese?: string; pinyin?: string; english?: string; example_sentence?: string; emoji?: string }
+): Promise<StudySetItem> {
+  const r = await fetch(`${API_BASE}/vocabulary/${vocabId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error('Failed to update term');
+  return r.json();
+}

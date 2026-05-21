@@ -30,8 +30,16 @@ router.get('/:id', (req, res) => {
 // Update vocabulary item
 router.put('/:id', (req, res) => {
     try {
-        const { pinyin, english, example_sentence, emoji } = req.body;
+        const { chinese, pinyin, english, example_sentence, emoji } = req.body;
         const id = parseInt(req.params.id);
+        if (typeof chinese === 'string' && chinese.trim()) {
+            const trimmed = chinese.trim();
+            const conflict = db.prepare('SELECT id FROM vocabulary WHERE chinese = ? AND id != ?').get(trimmed, id);
+            if (conflict) {
+                return res.status(409).json({ error: 'Another term with this Chinese text already exists' });
+            }
+            db.prepare('UPDATE vocabulary SET chinese = ? WHERE id = ?').run(trimmed, id);
+        }
         updateVocabulary(id, { pinyin, english, example_sentence, emoji });
         const updated = db.prepare('SELECT * FROM vocabulary WHERE id = ?').get(id);
         res.json(updated);
