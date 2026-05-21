@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Layers, BookOpen, Brain, Trash2, Plus, Volume2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Layers, BookOpen, Brain, Trash2, Plus, Volume2, Pencil, Check, X } from 'lucide-react';
 import {
   getStudySet,
   addStudySetItems,
   removeStudySetItem,
+  updateVocabularyItem,
   type StudySet,
+  type StudySetItem,
 } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 
@@ -18,6 +20,11 @@ export function StudySetDetailPage() {
   const [adding, setAdding] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [rawAdd, setRawAdd] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editChinese, setEditChinese] = useState('');
+  const [editPinyin, setEditPinyin] = useState('');
+  const [editEnglish, setEditEnglish] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const { speak } = useSpeechSynthesis();
 
   const load = async () => {
@@ -56,6 +63,50 @@ export function StudySetDetailPage() {
       setSet(s => s ? { ...s, items: s.items.filter(i => i.id !== vocabId) } : s);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const startEdit = (item: StudySetItem) => {
+    setEditingId(item.id);
+    setEditChinese(item.chinese);
+    setEditPinyin(item.pinyin || '');
+    setEditEnglish(item.english || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditChinese('');
+    setEditPinyin('');
+    setEditEnglish('');
+  };
+
+  const saveEdit = async () => {
+    if (editingId === null) return;
+    if (!editChinese.trim()) {
+      alert('Chinese text is required');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const updated = await updateVocabularyItem(editingId, {
+        chinese: editChinese.trim(),
+        pinyin: editPinyin.trim(),
+        english: editEnglish.trim(),
+      });
+      setSet(s => s ? {
+        ...s,
+        items: s.items.map(i =>
+          i.id === editingId
+            ? { ...i, chinese: updated.chinese, pinyin: updated.pinyin, english: updated.english }
+            : i
+        ),
+      } : s);
+      cancelEdit();
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || 'Failed to save');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -159,28 +210,85 @@ export function StudySetDetailPage() {
           ) : (
             <div className="space-y-2">
               {set.items.map(item => (
-                <div key={item.id} className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl group">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xl font-medium text-gray-800" style={{ fontFamily: '"Noto Sans SC", sans-serif' }}>
-                      {item.chinese}
-                    </p>
-                    <p className="text-sm text-amber-700">{item.pinyin}</p>
-                    <p className="text-sm text-gray-600">{item.english}</p>
+                editingId === item.id ? (
+                  <div key={item.id} className="p-3 bg-blue-50 border-2 border-blue-200 rounded-xl space-y-2">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Chinese</label>
+                      <input
+                        value={editChinese}
+                        onChange={(e) => setEditChinese(e.target.value)}
+                        className="w-full px-3 py-2 text-lg rounded-lg border-2 border-amber-200 focus:border-amber-400 focus:outline-none"
+                        style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-0.5">Pinyin</label>
+                        <input
+                          value={editPinyin}
+                          onChange={(e) => setEditPinyin(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border-2 border-amber-200 focus:border-amber-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-0.5">English</label>
+                        <input
+                          value={editEnglish}
+                          onChange={(e) => setEditEnglish(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border-2 border-amber-200 focus:border-amber-400 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        onClick={cancelEdit}
+                        disabled={savingEdit}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm"
+                      >
+                        <X className="w-3.5 h-3.5" /> Cancel
+                      </button>
+                      <button
+                        onClick={saveEdit}
+                        disabled={savingEdit || !editChinese.trim()}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm disabled:opacity-50"
+                      >
+                        {savingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        Save
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => speak(item.chinese)}
-                    className="p-2 text-amber-700 hover:bg-amber-200 rounded-full"
-                    title="Listen"
-                  >
-                    <Volume2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleRemove(item.id)}
-                    className="p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                ) : (
+                  <div key={item.id} className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl group">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xl font-medium text-gray-800 break-words" style={{ fontFamily: '"Noto Sans SC", sans-serif' }}>
+                        {item.chinese}
+                      </p>
+                      <p className="text-sm text-amber-700 break-words">{item.pinyin}</p>
+                      <p className="text-sm text-gray-600 break-words">{item.english}</p>
+                    </div>
+                    <button
+                      onClick={() => speak(item.chinese)}
+                      className="p-2 text-amber-700 hover:bg-amber-200 rounded-full"
+                      title="Listen"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => startEdit(item)}
+                      className="p-2 text-gray-500 hover:text-blue-600 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                      title="Edit term"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleRemove(item.id)}
+                      className="p-2 text-gray-400 hover:text-red-500 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                      title="Remove term"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )
               ))}
             </div>
           )}
