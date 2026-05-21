@@ -32,6 +32,8 @@ export function FlashcardsPage() {
   const [statuses, setStatuses] = useState<Record<number, Status>>({});
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [exitX, setExitX] = useState(0);
+  const [entering, setEntering] = useState(false);
   const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
   const swipedRef = useRef(false);
   const { speak } = useSpeechSynthesis();
@@ -40,6 +42,8 @@ export function FlashcardsPage() {
   const SWIPE_DISTANCE = 60;
   const SWIPE_MAX_VERTICAL = 60;
   const TAP_MAX_MOVE = 8;
+  const EXIT_DURATION = 280;  // ms to fly off-screen
+  const ENTER_DURATION = 200; // ms for the new card to fade in
 
   useEffect(() => {
     (async () => {
@@ -145,11 +149,20 @@ export function FlashcardsPage() {
     if (absDx > SWIPE_DISTANCE && absDy < SWIPE_MAX_VERTICAL && absDx > absDy) {
       swipedRef.current = true;
       e.preventDefault();
-      if (trackProgress) {
-        markAndAdvance(dx > 0 ? 'known' : 'dont_know');
-      } else {
-        dx > 0 ? next() : prev();
-      }
+      const direction = dx > 0 ? 1 : -1;
+      // Animate the card flying off-screen, then apply the action
+      setExitX(direction * (window.innerWidth || 400));
+      setTimeout(() => {
+        if (trackProgress) {
+          markAndAdvance(direction > 0 ? 'known' : 'dont_know');
+        } else {
+          direction > 0 ? next() : prev();
+        }
+        // Reset exit and trigger an enter animation for the new card
+        setExitX(0);
+        setEntering(true);
+        setTimeout(() => setEntering(false), ENTER_DURATION);
+      }, EXIT_DURATION);
     }
   };
 
@@ -303,8 +316,21 @@ export function FlashcardsPage() {
           style={{
             perspective: '1000px',
             touchAction: 'pan-y',
-            transform: dragX !== 0 ? `translateX(${dragX}px) rotate(${dragX * 0.05}deg)` : undefined,
-            transition: isDragging ? 'none' : 'transform 200ms ease-out',
+            transform: exitX !== 0
+              ? `translateX(${exitX}px) rotate(${exitX * 0.06}deg)`
+              : dragX !== 0
+                ? `translateX(${dragX}px) rotate(${dragX * 0.05}deg)`
+                : entering
+                  ? 'scale(0.96)'
+                  : undefined,
+            opacity: exitX !== 0 ? 0 : entering ? 0.6 : 1,
+            transition: isDragging
+              ? 'none'
+              : exitX !== 0
+                ? `transform ${EXIT_DURATION}ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity ${EXIT_DURATION}ms ease-out`
+                : entering
+                  ? `transform ${ENTER_DURATION}ms ease-out, opacity ${ENTER_DURATION}ms ease-out`
+                  : 'transform 200ms ease-out, opacity 200ms ease-out',
           }}
         >
           {/* Swipe hint overlays (visible during drag, mainly useful when trackProgress is on) */}
