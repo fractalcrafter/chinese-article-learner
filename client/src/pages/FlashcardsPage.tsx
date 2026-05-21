@@ -50,6 +50,7 @@ export function FlashcardsPage() {
   const [exitX, setExitX] = useState(0);
   const [enterDir, setEnterDir] = useState<null | 'left' | 'right'>(null);
   const [carouselTarget, setCarouselTarget] = useState(0);
+  const [instantSnap, setInstantSnap] = useState(false);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -233,9 +234,19 @@ export function FlashcardsPage() {
       setCarouselTarget(direction * w);
       setDragX(0);
       window.setTimeout(() => {
+        // Snap track back to 0 INSTANTLY (no transition) and advance the index.
+        // Without instantSnap, the track would animate from +/-width back to 0
+        // and produce the visible bounce-back.
+        setInstantSnap(true);
         if (direction > 0) prev(); else next();
         setCarouselTarget(0);
-        isAnimatingRef.current = false;
+        // Re-enable the transition for the next swipe after the browser paints
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setInstantSnap(false);
+            isAnimatingRef.current = false;
+          });
+        });
       }, 260);
     }
   };
@@ -605,7 +616,7 @@ export function FlashcardsPage() {
             className="absolute inset-0"
             style={{
               transform: `translateX(${isDragging ? dragX : (carouselTarget !== 0 ? carouselTarget : 0)}px)`,
-              transition: isDragging ? 'none' : 'transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1)',
+              transition: isDragging || instantSnap ? 'none' : 'transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1)',
             }}
           >
             {/* Previous card (off-screen left) */}
