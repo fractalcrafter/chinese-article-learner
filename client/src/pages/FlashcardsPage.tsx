@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Volume2, Shuffle, ChevronLeft, ChevronRight,
-  RotateCcw, Check, X, Target, Trophy,
+  RotateCcw, Check, X, Target,
 } from 'lucide-react';
 import { getStudySet, type StudySet, type StudySetItem } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
@@ -34,9 +34,14 @@ export function FlashcardsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [exitX, setExitX] = useState(0);
   const [entering, setEntering] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [toast, setToast] = useState<{ text: string; tone: 'good' | 'kind' | 'wow' } | null>(null);
+  const [milestonesShown, setMilestonesShown] = useState<Set<number>>(new Set());
   const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
   const swipedRef = useRef(false);
   const isAnimatingRef = useRef(false);
+  const toastTimerRef = useRef<number | null>(null);
   const { speak } = useSpeechSynthesis();
 
   // Swipe thresholds (px)
@@ -84,13 +89,64 @@ export function FlashcardsPage() {
   };
   const markAndAdvance = (status: Exclude<Status, 'unseen'>) => {
     if (!current) return;
-    setStatuses(s => ({ ...s, [current.id]: status }));
+    const newStatuses = { ...statuses, [current.id]: status };
+    setStatuses(newStatuses);
+
+    // Streak + encouragement
+    let newStreak = streak;
+    if (status === 'known') {
+      newStreak = streak + 1;
+      setStreak(newStreak);
+      if (newStreak > bestStreak) setBestStreak(newStreak);
+      showEncouragement('known', newStreak);
+    } else {
+      setStreak(0);
+      showEncouragement('dont_know', 0);
+    }
+
+    // Milestone toast (25/50/75% of total — 100% is celebration screen)
+    const reviewed = Object.values(newStatuses).filter(s => s && s !== 'unseen').length;
+    const pct = Math.floor((reviewed / order.length) * 100);
+    [25, 50, 75].forEach(m => {
+      if (pct >= m && !milestonesShown.has(m)) {
+        setMilestonesShown(prev => new Set(prev).add(m));
+        const msg = m === 25 ? '🌱 25% — great start!'
+          : m === 50 ? '⛰️ Halfway there!'
+          : '🎯 75% — almost done!';
+        showToast(msg, 'wow', 2200);
+      }
+    });
+
     if (idx < order.length - 1) {
       setFlipped(false);
       setIdx(i => i + 1);
     } else {
       setFlipped(false);
     }
+  };
+
+  const KNOWN_MESSAGES = ['Nice! ✨', 'Got it! 🎯', 'Yes! 💯', 'Locked in 🔒', '👏 Solid'];
+  const STREAK_MESSAGES = ['🔥 On fire!', '🚀 Streak!', '💪 Crushing it!', '⚡ Unstoppable!'];
+  const KIND_MESSAGES = ["That's how we learn 🌱", "We'll come back 💪", 'Brain growing 🧠', '📚 Repetition wins', 'Worth another look 👀'];
+
+  const showEncouragement = (status: 'known' | 'dont_know', s: number) => {
+    let text: string;
+    let tone: 'good' | 'kind' | 'wow';
+    if (status === 'known') {
+      if (s >= 5) { text = `${STREAK_MESSAGES[Math.floor(Math.random() * STREAK_MESSAGES.length)]} ${s} in a row!`; tone = 'wow'; }
+      else if (s >= 3) { text = `🔥 ${s} in a row!`; tone = 'wow'; }
+      else { text = KNOWN_MESSAGES[Math.floor(Math.random() * KNOWN_MESSAGES.length)]; tone = 'good'; }
+    } else {
+      text = KIND_MESSAGES[Math.floor(Math.random() * KIND_MESSAGES.length)];
+      tone = 'kind';
+    }
+    showToast(text, tone, 1600);
+  };
+
+  const showToast = (text: string, tone: 'good' | 'kind' | 'wow', ms: number) => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    setToast({ text, tone });
+    toastTimerRef.current = window.setTimeout(() => setToast(null), ms);
   };
   const toggleShuffle = () => {
     if (isShuffled && set) {
@@ -108,14 +164,20 @@ export function FlashcardsPage() {
     setStatuses({});
     setIdx(0);
     setFlipped(false);
+    setStreak(0);
+    setBestStreak(0);
+    setMilestonesShown(new Set());
+    setToast(null);
+  };
+  const restartWholeSet = () => {
+    if (set) setOrder(isShuffled ? shuffle(set.items) : set.items);
+    resetProgress();
   };
   const studyDontKnows = () => {
     const remaining = order.filter(item => statuses[item.id] === 'dont_know');
     if (remaining.length === 0) return;
     setOrder(remaining);
-    setStatuses({});
-    setIdx(0);
-    setFlipped(false);
+    resetProgress();
   };
 
   // Touch swipe handlers (iOS + Android). Tap = flip; horizontal swipe = mark.
@@ -247,7 +309,12 @@ export function FlashcardsPage() {
             Track Progress {trackProgress ? 'ON' : 'OFF'}
           </button>
           {trackProgress && (
-            <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-3 text-sm flex-wrap">
+              {streak >= 3 && (
+                <span className="flex items-center gap-1 text-orange-600 font-semibold bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full text-xs animate-pulse">
+                  🔥 {streak} streak
+                </span>
+              )}
               <span className="flex items-center gap-1 text-green-700">
                 <Check className="w-4 h-4" /> {knownCount}
               </span>
@@ -265,27 +332,101 @@ export function FlashcardsPage() {
           )}
         </div>
 
-        {/* Completion banner */}
-        {trackProgress && reviewedAll && (
-          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-4 flex items-center gap-3">
-            <Trophy className="w-8 h-8 text-amber-500 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-semibold text-amber-900">All cards reviewed!</p>
-              <p className="text-sm text-amber-700">
-                {knownCount} known · {dontKnowCount} still don't know
-              </p>
+        {/* ============ Celebration screen ============ */}
+        {trackProgress && reviewedAll ? (
+          <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 text-center">
+            <div className="text-6xl mb-2">
+              {dontKnowCount === 0 ? '🏆' : knownCount > dontKnowCount ? '🎉' : '💪'}
             </div>
-            {dontKnowCount > 0 && (
-              <button
-                onClick={studyDontKnows}
-                className="px-3 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold"
-              >
-                Study {dontKnowCount} missed
-              </button>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
+              {dontKnowCount === 0
+                ? 'Perfect run!'
+                : knownCount === 0
+                  ? "Tough one — keep going!"
+                  : knownCount > dontKnowCount
+                    ? 'Nicely done!'
+                    : 'Solid effort!'}
+            </h2>
+            <p className="text-gray-500 mb-1">
+              You knew <span className="font-semibold text-green-700">{knownCount}</span> out of {order.length}
+              {' '}({Math.round((knownCount / order.length) * 100)}%)
+            </p>
+            {bestStreak >= 3 && (
+              <p className="text-sm text-orange-600 font-medium mb-1">
+                🔥 Best streak this round: {bestStreak}
+              </p>
             )}
-          </div>
-        )}
 
+            {/* Big visual breakdown bar */}
+            <div className="flex h-4 w-full rounded-full overflow-hidden mt-4 mb-6 bg-gray-100">
+              {knownCount > 0 && (
+                <div
+                  className="bg-green-500 flex items-center justify-center text-white text-xs font-bold"
+                  style={{ width: `${(knownCount / order.length) * 100}%` }}
+                  title={`${knownCount} known`}
+                >
+                  {knownCount / order.length > 0.12 ? knownCount : ''}
+                </div>
+              )}
+              {dontKnowCount > 0 && (
+                <div
+                  className="bg-red-400 flex items-center justify-center text-white text-xs font-bold"
+                  style={{ width: `${(dontKnowCount / order.length) * 100}%` }}
+                  title={`${dontKnowCount} don't know`}
+                >
+                  {dontKnowCount / order.length > 0.12 ? dontKnowCount : ''}
+                </div>
+              )}
+            </div>
+
+            {/* Don't-know list */}
+            {dontKnowCount > 0 && (
+              <div className="text-left bg-red-50 border border-red-200 rounded-xl p-4 mb-6 max-h-60 overflow-y-auto">
+                <p className="text-sm font-semibold text-red-800 mb-2">
+                  Worth another look ({dontKnowCount}):
+                </p>
+                <div className="space-y-1.5">
+                  {order.filter(it => statuses[it.id] === 'dont_know').map(it => (
+                    <div key={it.id} className="flex items-baseline gap-2 text-sm">
+                      <span
+                        className="font-medium text-gray-800"
+                        style={{ fontFamily: '"Noto Sans SC", sans-serif' }}
+                      >
+                        {it.chinese}
+                      </span>
+                      <span className="text-amber-700">{it.pinyin}</span>
+                      <span className="text-gray-500 truncate">— {it.english}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
+              {dontKnowCount > 0 && (
+                <button
+                  onClick={studyDontKnows}
+                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-semibold shadow-lg"
+                >
+                  <Target className="w-5 h-5" /> Study {dontKnowCount} I don't know
+                </button>
+              )}
+              <button
+                onClick={restartWholeSet}
+                className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-lg"
+              >
+                <RotateCcw className="w-5 h-5" /> Restart whole set
+              </button>
+            </div>
+            <button
+              onClick={() => navigate(`/sets/${setId}`)}
+              className="mt-4 text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              Back to set
+            </button>
+          </div>
+        ) : (
+        <>
         {/* Progress bar */}
         <div className="w-full h-2 bg-amber-100 rounded-full mb-6 overflow-hidden">
           <div
@@ -475,7 +616,27 @@ export function FlashcardsPage() {
             Shortcuts: space = flip · ← / swipe left = don't know · → / swipe right = know
           </p>
         )}
+        </>
+        )}
       </div>
+
+      {/* Floating encouragement toast */}
+      {toast && (
+        <div className="fixed inset-x-0 top-20 flex justify-center pointer-events-none z-50 px-4">
+          <div
+            className={`px-4 py-2 rounded-full shadow-xl text-white font-semibold text-sm transition-all duration-200 ${
+              toast.tone === 'wow'
+                ? 'bg-gradient-to-r from-orange-500 to-pink-500'
+                : toast.tone === 'kind'
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-500'
+                  : 'bg-gradient-to-r from-green-500 to-emerald-500'
+            }`}
+            style={{ animation: 'toastIn 0.25s ease-out' }}
+          >
+            {toast.text}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
