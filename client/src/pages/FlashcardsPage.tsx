@@ -9,6 +9,19 @@ import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 
 type Status = 'unseen' | 'known' | 'dont_know';
 
+const HIDDEN_KEY = (setId: number) => `monkey_hidden_${setId}`;
+
+function addToHidden(setId: number, vocabId: number) {
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEY(setId));
+    const arr: number[] = raw ? JSON.parse(raw) : [];
+    if (!arr.includes(vocabId)) {
+      arr.push(vocabId);
+      localStorage.setItem(HIDDEN_KEY(setId), JSON.stringify(arr));
+    }
+  } catch {}
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -95,6 +108,11 @@ export function FlashcardsPage() {
   const markAndAdvance = (status: Exclude<Status, 'unseen'>) => {
     if (!current) return;
     setStatuses(s => ({ ...s, [current.id]: status }));
+
+    // Auto-hide "known" terms from future study sessions for this set
+    if (status === 'known') {
+      addToHidden(setId, current.id);
+    }
 
     // Streak (shown in header badge only; no toasts)
     if (status === 'known') {
@@ -396,6 +414,11 @@ export function FlashcardsPage() {
               You knew <span className="font-semibold text-green-700">{knownCount}</span> out of {order.length}
               {' '}({Math.round((knownCount / order.length) * 100)}%)
             </p>
+            {knownCount > 0 && (
+              <p className="text-xs text-gray-400 mb-1">
+                ✓ {knownCount} known {knownCount === 1 ? 'term has' : 'terms have'} been hidden from this set. Use "Show all" on the set page to bring {knownCount === 1 ? 'it' : 'them'} back.
+              </p>
+            )}
             {bestStreak >= 3 && (
               <p className="text-sm text-orange-600 font-medium mb-1">
                 🔥 Best streak this round: {bestStreak}
