@@ -5,3 +5,18 @@
   60%  { transform: translateY(4px) scale(1.05); opacity: 1; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
+
+@keyframes cardSlideInFromRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes cardSlideInFromLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+.card-enter-from-right {
+  animation: cardSlideInFromRight 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.card-enter-from-left {
+  animation: cardSlideInFromLeft 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}

@@ -33,7 +33,7 @@ export function FlashcardsPage() {
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [exitX, setExitX] = useState(0);
-  const [entering, setEntering] = useState(false);
+  const [enterDir, setEnterDir] = useState<null | 'left' | 'right'>(null);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -42,13 +42,13 @@ export function FlashcardsPage() {
   const { speak } = useSpeechSynthesis();
 
   // Swipe thresholds (px) — kept generous so flicks register reliably on iOS
-  const SWIPE_DISTANCE = 45;       // min horizontal travel to count as a deliberate swipe
-  const SWIPE_FLICK_DISTANCE = 22; // min horizontal travel when it was a fast flick
-  const SWIPE_FLICK_MAX_MS = 280;  // a flick must end within this duration
-  const SWIPE_MAX_VERTICAL = 100;  // tolerate diagonal swipes
+  const SWIPE_DISTANCE = 45;
+  const SWIPE_FLICK_DISTANCE = 22;
+  const SWIPE_FLICK_MAX_MS = 280;
+  const SWIPE_MAX_VERTICAL = 100;
   const TAP_MAX_MOVE = 6;
-  const EXIT_DURATION = 280;
-  const ENTER_DURATION = 200;
+  const EXIT_DURATION = 200;
+  const ENTER_DURATION = 220;
 
   useEffect(() => {
     (async () => {
@@ -180,9 +180,6 @@ export function FlashcardsPage() {
     swipedRef.current = true;
     e.preventDefault();
     const direction = dx > 0 ? 1 : -1;
-    // Animate the card flying off-screen, then apply the action.
-    // We keep dragX as-is (don't reset) so the card continues from where the finger left it,
-    // then exitX takes over and animates it the rest of the way off-screen.
     isAnimatingRef.current = true;
     setExitX(direction * (window.innerWidth || 400));
     setDragX(0);
@@ -192,10 +189,11 @@ export function FlashcardsPage() {
       } else {
         direction > 0 ? next() : prev();
       }
+      // Slide the new card in from the opposite side, like swiping photos
       setExitX(0);
-      setEntering(true);
+      setEnterDir(direction > 0 ? 'left' : 'right');
       window.setTimeout(() => {
-        setEntering(false);
+        setEnterDir(null);
         isAnimatingRef.current = false;
       }, ENTER_DURATION);
     }, EXIT_DURATION);
@@ -442,25 +440,27 @@ export function FlashcardsPage() {
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
           onTouchCancel={() => { setIsDragging(false); setDragX(0); touchStart.current = null; }}
-          className="relative w-full h-96 sm:h-80 bg-white rounded-3xl shadow-xl cursor-pointer mb-6 select-none overflow-hidden"
+          className={`relative w-full h-96 sm:h-80 bg-white rounded-3xl shadow-xl cursor-pointer mb-6 select-none overflow-hidden ${
+            enterDir === 'right' ? 'card-enter-from-right' : enterDir === 'left' ? 'card-enter-from-left' : ''
+          }`}
           style={{
             perspective: '1000px',
             touchAction: 'pan-y',
-            transform: exitX !== 0
-              ? `translateX(${exitX}px) rotate(${exitX * 0.06}deg)`
-              : dragX !== 0
-                ? `translateX(${dragX}px) rotate(${dragX * 0.05}deg)`
-                : entering
-                  ? 'scale(0.96)'
+            transform: enterDir
+              ? undefined
+              : exitX !== 0
+                ? `translateX(${exitX}px) rotate(${exitX * 0.06}deg)`
+                : dragX !== 0
+                  ? `translateX(${dragX}px) rotate(${dragX * 0.05}deg)`
                   : undefined,
-            opacity: exitX !== 0 ? 0 : entering ? 0.6 : 1,
             transition: isDragging
               ? 'none'
-              : exitX !== 0
-                ? `transform ${EXIT_DURATION}ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity ${EXIT_DURATION}ms ease-out`
-                : entering
-                  ? `transform ${ENTER_DURATION}ms ease-out, opacity ${ENTER_DURATION}ms ease-out`
-                  : 'transform 200ms ease-out, opacity 200ms ease-out',
+              : enterDir
+                ? 'none'
+                : exitX !== 0
+                  ? `transform ${EXIT_DURATION}ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity ${EXIT_DURATION}ms ease-out`
+                  : 'transform 180ms ease-out',
+            opacity: exitX !== 0 ? 0 : 1,
           }}
         >
           {/* Swipe hint overlays (visible during drag, mainly useful when trackProgress is on) */}
