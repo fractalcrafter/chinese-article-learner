@@ -23,6 +23,9 @@ export function StudySetDetailPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editChinese, setEditChinese] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [inlineAddAfterId, setInlineAddAfterId] = useState<number | null>(null);
+  const [inlineAddValue, setInlineAddValue] = useState('');
+  const [addingInline, setAddingInline] = useState(false);
   const { speak } = useSpeechSynthesis();
 
   const load = async () => {
@@ -74,7 +77,7 @@ export function StudySetDetailPage() {
     setEditChinese('');
   };
 
-  const saveEdit = async () => {
+  const saveEdit = async (openInlineAddAfter = false) => {
     if (editingId === null) return;
     const trimmed = editChinese.trim();
     if (!trimmed) {
@@ -82,22 +85,52 @@ export function StudySetDetailPage() {
       return;
     }
     setSavingEdit(true);
+    const editedId = editingId;
     try {
-      const updated = await updateVocabularyItem(editingId, { chinese: trimmed });
+      const updated = await updateVocabularyItem(editedId, { chinese: trimmed });
       setSet(s => s ? {
         ...s,
         items: s.items.map(i =>
-          i.id === editingId
+          i.id === editedId
             ? { ...i, chinese: updated.chinese, pinyin: updated.pinyin, english: updated.english }
             : i
         ),
       } : s);
       cancelEdit();
+      if (openInlineAddAfter) {
+        setInlineAddAfterId(editedId);
+        setInlineAddValue('');
+      }
     } catch (e: any) {
       console.error(e);
       alert(e?.message || 'Failed to save');
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const cancelInlineAdd = () => {
+    setInlineAddAfterId(null);
+    setInlineAddValue('');
+  };
+
+  const handleInlineAdd = async (chainNext: boolean) => {
+    const trimmed = inlineAddValue.trim();
+    if (!trimmed) return;
+    setAddingInline(true);
+    try {
+      await addStudySetItems(setId, { rawInput: trimmed });
+      await load();
+      if (chainNext) {
+        setInlineAddValue('');
+      } else {
+        cancelInlineAdd();
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to add term');
+    } finally {
+      setAddingInline(false);
     }
   };
 
@@ -208,7 +241,7 @@ export function StudySetDetailPage() {
                       value={editChinese}
                       onChange={(e) => setEditChinese(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveEdit();
+                        if (e.key === 'Enter') saveEdit(false);
                         if (e.key === 'Escape') cancelEdit();
                       }}
                       autoFocus
@@ -216,7 +249,7 @@ export function StudySetDetailPage() {
                       className="w-full px-3 py-2 text-xl rounded-lg border-2 border-amber-200 focus:border-amber-400 focus:outline-none"
                       style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
                     />
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                       <button
                         onClick={cancelEdit}
                         disabled={savingEdit}
@@ -225,7 +258,16 @@ export function StudySetDetailPage() {
                         <X className="w-3.5 h-3.5" /> Cancel
                       </button>
                       <button
-                        onClick={saveEdit}
+                        onClick={() => saveEdit(true)}
+                        disabled={savingEdit || !editChinese.trim()}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50"
+                        title="Save this term then add a new one right below"
+                      >
+                        {savingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                        Save & Add Below
+                      </button>
+                      <button
+                        onClick={() => saveEdit(false)}
                         disabled={savingEdit || !editChinese.trim()}
                         className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm disabled:opacity-50"
                       >
@@ -235,7 +277,8 @@ export function StudySetDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <div key={item.id} className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl group">
+                  <div key={item.id}>
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl group">
                     <div className="flex-1 min-w-0">
                       <p className="text-xl font-medium text-gray-800 break-words" style={{ fontFamily: '"Noto Sans SC", sans-serif' }}>
                         {item.chinese}
@@ -258,6 +301,16 @@ export function StudySetDetailPage() {
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => {
+                        setInlineAddAfterId(item.id);
+                        setInlineAddValue('');
+                      }}
+                      className="p-2 text-gray-500 hover:text-green-600 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                      title="Add a new term below"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => handleRemove(item.id)}
                       className="p-2 text-gray-400 hover:text-red-500 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
                       title="Remove term"
@@ -265,12 +318,72 @@ export function StudySetDetailPage() {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
+                  {inlineAddAfterId === item.id && (
+                    <div className="mt-2 p-3 bg-green-50 border-2 border-green-200 rounded-xl space-y-2">
+                      <label className="block text-xs text-gray-500">New term (Chinese)</label>
+                      <input
+                        value={inlineAddValue}
+                        onChange={(e) => setInlineAddValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleInlineAdd(e.shiftKey);
+                          if (e.key === 'Escape') cancelInlineAdd();
+                        }}
+                        autoFocus
+                        disabled={addingInline}
+                        placeholder="Type Chinese characters…"
+                        className="w-full px-3 py-2 text-xl rounded-lg border-2 border-green-200 focus:border-green-400 focus:outline-none"
+                        style={{ fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif' }}
+                      />
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          onClick={cancelInlineAdd}
+                          disabled={addingInline}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm"
+                        >
+                          <X className="w-3.5 h-3.5" /> Cancel
+                        </button>
+                        <button
+                          onClick={() => handleInlineAdd(true)}
+                          disabled={addingInline || !inlineAddValue.trim()}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm disabled:opacity-50"
+                          title="Add and start another (Shift+Enter)"
+                        >
+                          {addingInline ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                          Add & Next
+                        </button>
+                        <button
+                          onClick={() => handleInlineAdd(false)}
+                          disabled={addingInline || !inlineAddValue.trim()}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm disabled:opacity-50"
+                        >
+                          {addingInline ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  </div>
                 )
               ))}
             </div>
           )}
         </div>
       </div>
+
+      <button
+        onClick={() => {
+          setShowAdd(true);
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          });
+        }}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-xl active:scale-95 transition-transform"
+        title="Add terms (paste multiple)"
+        aria-label="Add terms"
+      >
+        <Plus className="w-5 h-5" />
+        <span className="hidden sm:inline">Add terms</span>
+      </button>
     </div>
   );
 }
