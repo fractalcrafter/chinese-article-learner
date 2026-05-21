@@ -44,12 +44,14 @@ export function FlashcardsPage() {
   const toastTimerRef = useRef<number | null>(null);
   const { speak } = useSpeechSynthesis();
 
-  // Swipe thresholds (px)
-  const SWIPE_DISTANCE = 60;
-  const SWIPE_MAX_VERTICAL = 60;
-  const TAP_MAX_MOVE = 8;
-  const EXIT_DURATION = 280;  // ms to fly off-screen
-  const ENTER_DURATION = 200; // ms for the new card to fade in
+  // Swipe thresholds (px) — kept generous so flicks register reliably on iOS
+  const SWIPE_DISTANCE = 45;       // min horizontal travel to count as a deliberate swipe
+  const SWIPE_FLICK_DISTANCE = 22; // min horizontal travel when it was a fast flick
+  const SWIPE_FLICK_MAX_MS = 280;  // a flick must end within this duration
+  const SWIPE_MAX_VERTICAL = 100;  // tolerate diagonal swipes
+  const TAP_MAX_MOVE = 6;
+  const EXIT_DURATION = 280;
+  const ENTER_DURATION = 200;
 
   useEffect(() => {
     (async () => {
@@ -182,7 +184,6 @@ export function FlashcardsPage() {
 
   // Touch swipe handlers (iOS + Android). Tap = flip; horizontal swipe = mark.
   const onTouchStart = (e: React.TouchEvent) => {
-    if (isAnimatingRef.current) return;
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     touchStart.current = { x: t.clientX, y: t.clientY, t: Date.now() };
@@ -190,7 +191,7 @@ export function FlashcardsPage() {
     setIsDragging(true);
   };
   const onTouchMove = (e: React.TouchEvent) => {
-    if (!touchStart.current || isAnimatingRef.current) return;
+    if (!touchStart.current) return;
     const t = e.touches[0];
     const dx = t.clientX - touchStart.current.x;
     const dy = t.clientY - touchStart.current.y;
@@ -202,39 +203,48 @@ export function FlashcardsPage() {
   const onTouchEnd = (e: React.TouchEvent) => {
     const start = touchStart.current;
     setIsDragging(false);
-    setDragX(0);
     touchStart.current = null;
-    if (!start || isAnimatingRef.current) return;
+    if (!start) { setDragX(0); return; }
     const t = e.changedTouches[0];
     const dx = t.clientX - start.x;
     const dy = t.clientY - start.y;
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
-    if (absDx > SWIPE_DISTANCE && absDy < SWIPE_MAX_VERTICAL && absDx > absDy) {
-      swipedRef.current = true;
-      e.preventDefault();
-      const direction = dx > 0 ? 1 : -1;
-      isAnimatingRef.current = true;
-      // Flip back to the front immediately so the back side isn't revealed
-      // on the next card. The flip transition runs in parallel with the exit.
-      setFlipped(false);
-      // Animate the card flying off-screen, then apply the action
-      setExitX(direction * (window.innerWidth || 400));
-      setTimeout(() => {
-        if (trackProgress) {
-          markAndAdvance(direction > 0 ? 'known' : 'dont_know');
-        } else {
-          direction > 0 ? next() : prev();
-        }
-        // Reset exit and trigger an enter animation for the new card
-        setExitX(0);
-        setEntering(true);
-        setTimeout(() => {
-          setEntering(false);
-          isAnimatingRef.current = false;
-        }, ENTER_DURATION);
-      }, EXIT_DURATION);
+    const elapsed = Date.now() - start.t;
+    const isFlick = elapsed < SWIPE_FLICK_MAX_MS && absDx >= SWIPE_FLICK_DISTANCE;
+    const isSwipe =
+      absDy < SWIPE_MAX_VERTICAL &&
+      absDx > absDy &&
+      (absDx > SWIPE_DISTANCE || isFlick);
+
+    if (!isSwipe) {
+      // Not a swipe — bounce back
+      setDragX(0);
+      return;
     }
+
+    swipedRef.current = true;
+    e.preventDefault();
+    const direction = dx > 0 ? 1 : -1;
+    // Animate the card flying off-screen, then apply the action.
+    // We keep dragX as-is (don't reset) so the card continues from where the finger left it,
+    // then exitX takes over and animates it the rest of the way off-screen.
+    isAnimatingRef.current = true;
+    setExitX(direction * (window.innerWidth || 400));
+    setDragX(0);
+    window.setTimeout(() => {
+      if (trackProgress) {
+        markAndAdvance(direction > 0 ? 'known' : 'dont_know');
+      } else {
+        direction > 0 ? next() : prev();
+      }
+      setExitX(0);
+      setEntering(true);
+      window.setTimeout(() => {
+        setEntering(false);
+        isAnimatingRef.current = false;
+      }, ENTER_DURATION);
+    }, EXIT_DURATION);
   };
 
   const onCardClick = () => {
