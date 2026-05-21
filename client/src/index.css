@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --font-chinese: "KaiTi", "STKaiti", "AR PL UKai CN", "AR PL UKai TW", "Edukai-3", "BiauKai", "DFKai-SB", serif;
+  --font-chinese: "Kaiti SC", "KaiTi SC", "STKaiti", "KaiTi", "BiauKai", "DFKai-SB",
+                  "AR PL UKai CN", "AR PL UKai TW", "AR PL UKai HK", "Edukai-3",
+                  "Noto Serif SC", "ZCOOL KuaiLe", "Songti SC", "SimSun", serif;
 }
 .font-chinese { font-family: var(--font-chinese); }
 
