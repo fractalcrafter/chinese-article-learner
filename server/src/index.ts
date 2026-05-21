@@ -4,9 +4,11 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDatabase } from './db.js';
+import { seedInitialData } from './seed.js';
 import articlesRouter from './routes/articles.js';
 import vocabularyRouter from './routes/vocabulary.js';
 import authRouter from './routes/auth.js';
+import setsRouter from './routes/sets.js';
 
 // Load environment variables
 dotenv.config();
@@ -16,19 +18,27 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174')
+  .split(',')
+  .map(s => s.trim());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(null, false);
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 
 // Initialize database
 initDatabase();
+seedInitialData();
 
 // API Routes
 app.use('/api/articles', articlesRouter);
 app.use('/api/vocabulary', vocabularyRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/sets', setsRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

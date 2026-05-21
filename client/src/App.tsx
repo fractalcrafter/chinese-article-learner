@@ -5,6 +5,10 @@ import { RecordPage } from './pages/RecordPage';
 import { ArticlePage } from './pages/ArticlePage';
 import { LoginPage } from './pages/LoginPage';
 import { ProgressPage } from './pages/ProgressPage';
+import { StudySetsPage } from './pages/StudySetsPage';
+import { StudySetDetailPage } from './pages/StudySetDetailPage';
+import { FlashcardsPage } from './pages/FlashcardsPage';
+import { LearnPage } from './pages/LearnPage';
 import { Loader2 } from 'lucide-react';
 import './index.css';
 
@@ -46,6 +50,10 @@ function AppRoutes() {
       <Route path="/" element={<ProtectedRoute><RecordPage /></ProtectedRoute>} />
       <Route path="/progress" element={<ProtectedRoute><ProgressPage /></ProtectedRoute>} />
       <Route path="/article/:id" element={<ProtectedRoute><ArticlePage /></ProtectedRoute>} />
+      <Route path="/sets" element={<ProtectedRoute><StudySetsPage /></ProtectedRoute>} />
+      <Route path="/sets/:id" element={<ProtectedRoute><StudySetDetailPage /></ProtectedRoute>} />
+      <Route path="/sets/:id/flashcards" element={<ProtectedRoute><FlashcardsPage /></ProtectedRoute>} />
+      <Route path="/sets/:id/learn" element={<ProtectedRoute><LearnPage /></ProtectedRoute>} />
     </Routes>
   );
 }

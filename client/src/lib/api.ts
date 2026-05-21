@@ -232,3 +232,84 @@ export async function updateVocabularyProgress(
   });
   if (!response.ok) throw new Error('Failed to update progress');
 }
+
+// ============ Study Sets (Quizlet-style) ============
+
+export type StudySetSummary = {
+  id: number;
+  title: string;
+  description: string | null;
+  created_at: string;
+  item_count: number;
+};
+
+export type StudySetItem = {
+  id: number;
+  chinese: string;
+  pinyin: string;
+  english: string;
+  example_sentence: string;
+  emoji: string;
+  position: number;
+};
+
+export type StudySet = {
+  id: number;
+  title: string;
+  description: string | null;
+  created_at: string;
+  items: StudySetItem[];
+};
+
+export async function getStudySets(): Promise<StudySetSummary[]> {
+  const r = await fetch(`${API_BASE}/sets`);
+  if (!r.ok) throw new Error('Failed to fetch sets');
+  return r.json();
+}
+
+export async function getStudySet(id: number): Promise<StudySet> {
+  const r = await fetch(`${API_BASE}/sets/${id}`);
+  if (!r.ok) throw new Error('Failed to fetch set');
+  return r.json();
+}
+
+export async function createStudySet(data: {
+  title: string;
+  description?: string;
+  rawInput?: string;
+  chineseList?: string[];
+}): Promise<{ id: number }> {
+  const r = await fetch(`${API_BASE}/sets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(`Failed to create set: ${t}`);
+  }
+  return r.json();
+}
+
+export async function deleteStudySet(id: number): Promise<void> {
+  const r = await fetch(`${API_BASE}/sets/${id}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error('Failed to delete set');
+}
+
+export async function addStudySetItems(
+  id: number,
+  data: { rawInput?: string; chineseList?: string[] }
+): Promise<{ added: StudySetItem[] }> {
+  const r = await fetch(`${API_BASE}/sets/${id}/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error('Failed to add items');
+  return r.json();
+}
+
+export async function removeStudySetItem(setId: number, vocabId: number): Promise<void> {
+  const r = await fetch(`${API_BASE}/sets/${setId}/items/${vocabId}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error('Failed to remove item');
+}
