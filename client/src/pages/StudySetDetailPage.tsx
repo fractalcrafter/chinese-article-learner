@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Layers, BookOpen, Brain, Trash2, Plus, Volume2, Pencil, Check, X, Eye, EyeOff } from 'lucide-react';
 import {
@@ -19,13 +19,17 @@ function loadHidden(setId: number): Set<number> {
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
     if (Array.isArray(arr)) return new Set(arr.filter(n => typeof n === 'number'));
-  } catch {}
+  } catch {
+    return new Set();
+  }
   return new Set();
 }
 function saveHidden(setId: number, hidden: Set<number>) {
   try {
     localStorage.setItem(HIDDEN_KEY(setId), JSON.stringify([...hidden]));
-  } catch {}
+  } catch {
+    // localStorage may be unavailable in private browsing modes.
+  }
 }
 
 export function StudySetDetailPage() {
@@ -69,6 +73,10 @@ export function StudySetDetailPage() {
     () => set ? set.items.filter(i => !hidden.has(i.id)).map(i => i.id) : [],
     [set, hidden]
   );
+  const pendingEnrichmentCount = useMemo(
+    () => set ? set.items.filter(i => !i.pinyin || !i.english).length : 0,
+    [set]
+  );
 
   const toggleHidden = (vocabId: number) => {
     setHidden(prev => {
@@ -97,18 +105,26 @@ export function StudySetDetailPage() {
     });
   };
 
-  const load = async () => {
-    setLoading(true);
+  const load = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       setSet(await getStudySet(setId));
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
-  };
+  }, [setId]);
 
-  useEffect(() => { if (setId) load(); }, [setId]);
+  useEffect(() => { if (setId) load(); }, [setId, load]);
+
+  useEffect(() => {
+    if (!setId || pendingEnrichmentCount === 0) return;
+    const timer = window.setInterval(() => {
+      void load(false);
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [load, pendingEnrichmentCount, setId]);
 
   const handleAdd = async () => {
     if (!rawAdd.trim()) return;
@@ -175,9 +191,9 @@ export function StudySetDetailPage() {
         setInlineAddAfterId(editedId);
         setInlineAddValue('');
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      alert(e?.message || 'Failed to save');
+      alert(e instanceof Error ? e.message : 'Failed to save');
     } finally {
       setSavingEdit(false);
     }
@@ -327,6 +343,13 @@ export function StudySetDetailPage() {
             </div>
           )}
 
+          {pendingEnrichmentCount > 0 && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-700">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Generating pinyin & translations for {pendingEnrichmentCount} {pendingEnrichmentCount === 1 ? 'term' : 'terms'}...
+            </div>
+          )}
+
           {set.items.length === 0 ? (
             <p className="text-gray-500 text-center py-6">No terms yet.</p>
           ) : (
@@ -383,8 +406,12 @@ export function StudySetDetailPage() {
                       <p className="text-xl font-medium text-gray-800 break-words" style={{ fontFamily: 'var(--font-chinese)' }}>
                         {item.chinese}
                       </p>
-                      <p className="text-sm text-amber-700 break-words">{item.pinyin}</p>
-                      <p className="text-sm text-gray-600 break-words">{item.english}</p>
+                      <p className="text-sm text-amber-700 break-words">
+                        {item.pinyin || <span className="text-amber-400 animate-pulse">-</span>}
+                      </p>
+                      <p className="text-sm text-gray-600 break-words">
+                        {item.english || <span className="text-gray-400 animate-pulse">-</span>}
+                      </p>
                     </div>
                     <button
                       onClick={() => toggleHidden(item.id)}
