@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Volume2, Shuffle, ChevronLeft, ChevronRight,
-  RotateCcw, Check, X, Target, Brain,
+  RotateCcw, Check, X, Target, Brain, Undo2,
 } from 'lucide-react';
 import { getStudySet, type StudySet, type StudySetItem } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
@@ -19,6 +19,16 @@ function addToHidden(setId: number, vocabId: number) {
       arr.push(vocabId);
       localStorage.setItem(HIDDEN_KEY(setId), JSON.stringify(arr));
     }
+  } catch {}
+}
+
+function removeFromHidden(setId: number, vocabId: number) {
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEY(setId));
+    if (!raw) return;
+    const arr: number[] = JSON.parse(raw);
+    const next = arr.filter((id) => id !== vocabId);
+    localStorage.setItem(HIDDEN_KEY(setId), JSON.stringify(next));
   } catch {}
 }
 
@@ -53,6 +63,15 @@ export function FlashcardsPage() {
   const [instantSnap, setInstantSnap] = useState(false);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
+  type UndoEntry = {
+    cardId: number;
+    idx: number;
+    prevStatus: Status | undefined;
+    addedToHidden: boolean;
+    prevStreak: number;
+    prevBestStreak: number;
+  };
+  const [history, setHistory] = useState<UndoEntry[]>([]);
   const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
   const swipedRef = useRef(false);
   const isAnimatingRef = useRef(false);
@@ -108,14 +127,26 @@ export function FlashcardsPage() {
   };
   const markAndAdvance = (status: Exclude<Status, 'unseen'>) => {
     if (!current) return;
+    const prevStatus = statuses[current.id];
+    const wasHidden = (() => {
+      try {
+        const raw = localStorage.getItem(HIDDEN_KEY(setId));
+        return raw ? (JSON.parse(raw) as number[]).includes(current.id) : false;
+      } catch { return false; }
+    })();
+
     setStatuses(s => ({ ...s, [current.id]: status }));
 
     // Auto-hide "known" terms from future study sessions for this set
-    if (status === 'known') {
+    let addedToHidden = false;
+    if (status === 'known' && !wasHidden) {
       addToHidden(setId, current.id);
+      addedToHidden = true;
     }
 
     // Streak (shown in header badge only; no toasts)
+    const prevStreak = streak;
+    const prevBestStreak = bestStreak;
     if (status === 'known') {
       const newStreak = streak + 1;
       setStreak(newStreak);
@@ -124,12 +155,43 @@ export function FlashcardsPage() {
       setStreak(0);
     }
 
+    setHistory(h => [...h, {
+      cardId: current.id,
+      idx,
+      prevStatus,
+      addedToHidden,
+      prevStreak,
+      prevBestStreak,
+    }]);
+
     if (idx < order.length - 1) {
       setFlipped(false);
       setIdx(i => i + 1);
     } else {
       setFlipped(false);
     }
+  };
+
+  const undo = () => {
+    if (history.length === 0) return;
+    const last = history[history.length - 1];
+    setHistory(h => h.slice(0, -1));
+    setStatuses(s => {
+      const copy = { ...s };
+      if (last.prevStatus === undefined) {
+        delete copy[last.cardId];
+      } else {
+        copy[last.cardId] = last.prevStatus;
+      }
+      return copy;
+    });
+    if (last.addedToHidden) {
+      removeFromHidden(setId, last.cardId);
+    }
+    setStreak(last.prevStreak);
+    setBestStreak(last.prevBestStreak);
+    setIdx(last.idx);
+    setFlipped(false);
   };
   const baseItems = useMemo(() => {
     if (!set) return [];
@@ -148,14 +210,16 @@ export function FlashcardsPage() {
     }
     setIdx(0);
     setFlipped(false);
+    setHistory([]);
   };
-  const restart = () => { setIdx(0); setFlipped(false); };
+  const restart = () => { setIdx(0); setFlipped(false); setHistory([]); };
   const resetProgress = () => {
     setStatuses({});
     setIdx(0);
     setFlipped(false);
     setStreak(0);
     setBestStreak(0);
+    setHistory([]);
   };
   const restartWholeSet = () => {
     setOrder(isShuffled ? shuffle(baseItems) : baseItems);
@@ -264,6 +328,13 @@ export function FlashcardsPage() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === ' ') { e.preventDefault(); setFlipped(f => !f); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        if (trackProgress && history.length > 0) {
+          e.preventDefault();
+          undo();
+        }
+        return;
+      }
       if (trackProgress) {
         if (e.key === 'ArrowRight') { e.preventDefault(); markAndAdvance('known'); }
         else if (e.key === 'ArrowLeft') { e.preventDefault(); markAndAdvance('dont_know'); }
@@ -275,7 +346,7 @@ export function FlashcardsPage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order.length, idx, trackProgress, current?.id]);
+  }, [order.length, idx, trackProgress, current?.id, history.length]);
 
   const renderCardFace = (item: StudySetItem, isFlipped: boolean, interactive: boolean) => (
     <div
@@ -660,6 +731,17 @@ export function FlashcardsPage() {
           )}
 
           <div className="flex gap-2">
+            {trackProgress && (
+              <button
+                onClick={undo}
+                disabled={history.length === 0}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl shadow hover:shadow-md bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Undo last mark (Ctrl/Cmd+Z)"
+                aria-label="Undo last mark"
+              >
+                <Undo2 className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={toggleShuffle}
               className={`flex items-center gap-1 px-3 py-2 rounded-xl shadow hover:shadow-md ${
@@ -699,7 +781,7 @@ export function FlashcardsPage() {
 
         {trackProgress && (
           <p className="text-center text-xs text-gray-400 mt-3">
-            Shortcuts: space = flip · ← / swipe left = don't know · → / swipe right = know
+            Shortcuts: space = flip · ← / swipe left = don't know · → / swipe right = know · ⌘/Ctrl+Z = undo
           </p>
         )}
         </>
