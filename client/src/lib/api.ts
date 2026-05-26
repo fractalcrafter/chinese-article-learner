@@ -296,6 +296,18 @@ export async function deleteStudySet(id: number): Promise<void> {
   if (!r.ok) throw new Error('Failed to delete set');
 }
 
+export async function updateStudySet(
+  id: number,
+  data: { title?: string; description?: string }
+): Promise<void> {
+  const r = await fetch(`${API_BASE}/sets/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error('Failed to update set');
+}
+
 export async function addStudySetItems(
   id: number,
   data: { rawInput?: string; chineseList?: string[] }

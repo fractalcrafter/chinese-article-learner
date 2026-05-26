@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, Trash2, Layers, ArrowLeft, Sparkles } from 'lucide-react';
-import { getStudySets, createStudySet, deleteStudySet, type StudySetSummary } from '../lib/api';
+import { Loader2, Plus, Trash2, Layers, ArrowLeft, Sparkles, Pencil, Check, X } from 'lucide-react';
+import { getStudySets, createStudySet, deleteStudySet, updateStudySet, type StudySetSummary } from '../lib/api';
 
 export function StudySetsPage() {
   const navigate = useNavigate();
@@ -11,6 +11,9 @@ export function StudySetsPage() {
   const [title, setTitle] = useState('');
   const [rawInput, setRawInput] = useState('');
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -47,6 +50,40 @@ export function StudySetsPage() {
     } catch (e) {
       console.error(e);
       alert('Failed to delete');
+    }
+  };
+
+  const startEdit = (s: StudySetSummary, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(s.id);
+    setEditTitle(s.title);
+  };
+
+  const cancelEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(null);
+    setEditTitle('');
+  };
+
+  const saveEdit = async (id: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const newTitle = editTitle.trim();
+    if (!newTitle) return;
+    const current = sets.find(s => s.id === id);
+    if (current && current.title === newTitle) {
+      setEditingId(null);
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await updateStudySet(id, { title: newTitle });
+      setSets(prev => prev.map(s => s.id === id ? { ...s, title: newTitle } : s));
+      setEditingId(null);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to rename set');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -129,27 +166,78 @@ export function StudySetsPage() {
             <p className="text-gray-500 text-center py-6">No sets yet. Create your first one above!</p>
           ) : (
             <div className="space-y-2">
-              {sets.map(s => (
+              {sets.map(s => {
+                const isEditing = editingId === s.id;
+                return (
                 <div
                   key={s.id}
-                  onClick={() => navigate(`/sets/${s.id}`)}
-                  className="flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 rounded-xl cursor-pointer transition-colors group"
+                  onClick={() => !isEditing && navigate(`/sets/${s.id}`)}
+                  className={`flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors group ${isEditing ? '' : 'cursor-pointer'}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-800 truncate">{s.title}</p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editTitle}
+                        autoFocus
+                        disabled={savingEdit}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); saveEdit(s.id); }
+                          if (e.key === 'Escape') { e.preventDefault(); setEditingId(null); }
+                        }}
+                        className="w-full px-3 py-1.5 rounded-lg border-2 border-amber-300 focus:border-amber-500 focus:outline-none font-medium text-gray-800 bg-white"
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-800 truncate">{s.title}</p>
+                    )}
                     <p className="text-sm text-gray-500">
                       {s.item_count} {s.item_count === 1 ? 'term' : 'terms'} · {new Date(s.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <button
-                    onClick={(e) => handleDelete(s.id, e)}
-                    aria-label="Delete set"
-                    className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 ml-2">
+                    {isEditing ? (
+                      <>
+                        <button
+                          onClick={(e) => saveEdit(s.id, e)}
+                          disabled={savingEdit || !editTitle.trim()}
+                          aria-label="Save name"
+                          className="p-2 text-green-600 hover:text-green-700 disabled:opacity-40"
+                        >
+                          {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          disabled={savingEdit}
+                          aria-label="Cancel rename"
+                          className="p-2 text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => startEdit(s, e)}
+                          aria-label="Rename set"
+                          className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(s.id, e)}
+                          aria-label="Delete set"
+                          className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
