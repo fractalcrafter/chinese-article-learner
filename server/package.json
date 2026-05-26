@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && node -e \"require('fs').copyFileSync('src/seed-data.json','dist/seed-data.json')\"",
+    "build": "tsc && node -e \"const fs=require('fs');for(const f of fs.readdirSync('src').filter(n=>/^seed-data.*\\.json$/.test(n)))fs.copyFileSync('src/'+f,'dist/'+f);\"",
     "start": "node dist/index.js"
   },
   "keywords": [
