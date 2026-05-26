@@ -246,8 +246,8 @@ export type StudySetSummary = {
 export type StudySetItem = {
   id: number;
   chinese: string;
-  pinyin: string;
-  english: string;
+  pinyin: string | null;
+  english: string | null;
   example_sentence: string;
   emoji: string;
   position: number;

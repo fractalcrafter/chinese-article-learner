@@ -1,8 +1,18 @@
 import { Router } from 'express';
 import { db, getOrCreateVocabulary, updateVocabulary } from '../db.js';
-import { getPinyin, translateText } from '../services/ai.js';
+import { batchEnrichWords } from '../services/ai.js';
 
 const router = Router();
+
+type VocabularyRow = {
+  id: number;
+  chinese: string;
+  pinyin: string | null;
+  english: string | null;
+  example_sentence?: string | null;
+  emoji?: string | null;
+  position?: number;
+};
 
 // Parse pasted input into individual Chinese words.
 // Splits on newlines, commas (both ASCII and Chinese), semicolons, tabs, and whitespace.
@@ -21,31 +31,87 @@ function parseChineseList(input: string): string[] {
   return out;
 }
 
-// Helper: enrich a vocabulary entry with pinyin + english if missing.
-async function ensureVocabularyEnriched(vocab: any) {
-  const needsPinyin = !vocab.pinyin;
-  const needsEnglish = !vocab.english;
-  if (!needsPinyin && !needsEnglish) return vocab;
-
-  const updates: { pinyin?: string; english?: string } = {};
-  if (needsPinyin) {
-    try {
-      updates.pinyin = getPinyin(vocab.chinese);
-    } catch (e) {
-      console.error('Pinyin failed for', vocab.chinese, e);
-    }
+function uniqueVocabularyRows(rows: VocabularyRow[]): VocabularyRow[] {
+  const byChinese = new Map<string, VocabularyRow>();
+  for (const row of rows) {
+    if (!byChinese.has(row.chinese)) byChinese.set(row.chinese, row);
   }
-  if (needsEnglish) {
-    try {
-      updates.english = await translateText(vocab.chinese);
-    } catch (e) {
-      console.error('Translation failed for', vocab.chinese, e);
-      updates.english = '(Translation unavailable)';
-    }
-  }
-  updateVocabulary(vocab.id, updates);
-  return { ...vocab, ...updates };
+  return [...byChinese.values()];
 }
+
+function enrichVocabularyInBackground(rows: VocabularyRow[]) {
+  const vocabularyRows = uniqueVocabularyRows(rows);
+  if (vocabularyRows.length === 0) return;
+
+  void (async () => {
+    const enriched = await batchEnrichWords(vocabularyRows.map(row => row.chinese));
+    const rowsByChinese = new Map(vocabularyRows.map(row => [row.chinese, row]));
+    const currentStmt = db.prepare('SELECT chinese, pinyin, english FROM vocabulary WHERE id = ?');
+
+    for (const item of enriched) {
+      const row = rowsByChinese.get(item.chinese);
+      if (!row) continue;
+
+      const current = currentStmt.get(row.id) as VocabularyRow | undefined;
+      if (!current || current.chinese !== item.chinese) continue;
+
+      const updates: { pinyin?: string; english?: string } = {};
+      if (current.pinyin === row.pinyin) updates.pinyin = item.pinyin;
+      if (current.english === row.english) updates.english = item.english;
+      updateVocabulary(row.id, updates);
+    }
+  })().catch(error => {
+    console.error('Background vocabulary enrichment failed:', error);
+  });
+}
+
+const createSetWithVocabulary = db.transaction((
+  title: string,
+  description: string | null,
+  words: string[]
+) => {
+  const result = db.prepare(
+    'INSERT INTO study_sets (title, description) VALUES (?, ?)'
+  ).run(title, description);
+  const setId = Number(result.lastInsertRowid);
+  const linkStmt = db.prepare(
+    'INSERT OR IGNORE INTO study_set_vocab (set_id, vocabulary_id, position) VALUES (?, ?, ?)'
+  );
+  const vocabularyRows: VocabularyRow[] = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const vocab = getOrCreateVocabulary(words[i]) as VocabularyRow;
+    linkStmt.run(setId, vocab.id, i);
+    vocabularyRows.push(vocab);
+  }
+
+  return { setId, vocabularyRows };
+});
+
+const addVocabularyToSet = db.transaction((setId: number, words: string[]) => {
+  const maxPos = (db.prepare(
+    'SELECT COALESCE(MAX(position), -1) AS m FROM study_set_vocab WHERE set_id = ?'
+  ).get(setId) as { m: number }).m;
+  const linkStmt = db.prepare(
+    'INSERT OR IGNORE INTO study_set_vocab (set_id, vocabulary_id, position) VALUES (?, ?, ?)'
+  );
+  const vocabularyRows: VocabularyRow[] = [];
+  const added: VocabularyRow[] = [];
+  let pos = maxPos + 1;
+
+  for (const chinese of words) {
+    const vocab = getOrCreateVocabulary(chinese) as VocabularyRow;
+    const position = pos;
+    const result = linkStmt.run(setId, vocab.id, position);
+    vocabularyRows.push(vocab);
+    if (result.changes > 0) {
+      added.push({ ...vocab, position });
+      pos++;
+    }
+  }
+
+  return { vocabularyRows, added };
+});
 
 // GET /api/sets - list all sets with item counts
 router.get('/', (req, res) => {
@@ -65,7 +131,7 @@ router.get('/', (req, res) => {
 
 // POST /api/sets - create a set from a list of Chinese words
 // Body: { title, description?, chineseList?: string[] | rawInput?: string }
-router.post('/', async (req, res) => {
+router.post('/', (req, res) => {
   try {
     const { title, description, chineseList, rawInput } = req.body;
     if (!title || !title.trim()) {
@@ -79,21 +145,12 @@ router.post('/', async (req, res) => {
       words = parseChineseList(rawInput);
     }
 
-    const result = db.prepare(
-      'INSERT INTO study_sets (title, description) VALUES (?, ?)'
-    ).run(title.trim(), description?.trim() || null);
-    const setId = Number(result.lastInsertRowid);
-
-    // Add vocabulary items (auto-generate pinyin + english)
-    const linkStmt = db.prepare(
-      'INSERT OR IGNORE INTO study_set_vocab (set_id, vocabulary_id, position) VALUES (?, ?, ?)'
+    const { setId, vocabularyRows } = createSetWithVocabulary(
+      title.trim(),
+      description?.trim() || null,
+      words
     );
-    for (let i = 0; i < words.length; i++) {
-      const chinese = words[i];
-      let vocab = getOrCreateVocabulary(chinese) as any;
-      vocab = await ensureVocabularyEnriched(vocab);
-      linkStmt.run(setId, vocab.id, i);
-    }
+    enrichVocabularyInBackground(vocabularyRows);
 
     res.json({ id: setId, message: 'Set created' });
   } catch (e) {
@@ -157,7 +214,7 @@ router.delete('/:id', (req, res) => {
 });
 
 // POST /api/sets/:id/items - add words (rawInput or chineseList)
-router.post('/:id/items', async (req, res) => {
+router.post('/:id/items', (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const set = db.prepare('SELECT id FROM study_sets WHERE id = ?').get(id);
@@ -171,24 +228,9 @@ router.post('/:id/items', async (req, res) => {
       words = parseChineseList(rawInput);
     }
 
-    const maxPos = (db.prepare(
-      'SELECT COALESCE(MAX(position), -1) AS m FROM study_set_vocab WHERE set_id = ?'
-    ).get(id) as any).m;
+    const { vocabularyRows, added } = addVocabularyToSet(id, words);
+    enrichVocabularyInBackground(vocabularyRows);
 
-    const linkStmt = db.prepare(
-      'INSERT OR IGNORE INTO study_set_vocab (set_id, vocabulary_id, position) VALUES (?, ?, ?)'
-    );
-    let pos = maxPos + 1;
-    const added: any[] = [];
-    for (const chinese of words) {
-      let vocab = getOrCreateVocabulary(chinese) as any;
-      vocab = await ensureVocabularyEnriched(vocab);
-      const r = linkStmt.run(id, vocab.id, pos);
-      if (r.changes > 0) {
-        added.push({ ...vocab, position: pos });
-        pos++;
-      }
-    }
     res.json({ added });
   } catch (e) {
     console.error('Error adding items:', e);
