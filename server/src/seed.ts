@@ -21,17 +21,32 @@ interface SeedSet {
 }
 
 /**
- * Seed the database with the bundled study set if it doesn't already exist.
- * Idempotent — safe to call on every boot.
+ * Seed the database with any bundled study sets that don't already exist.
+ * Loads every `seed-data*.json` file next to this module. Idempotent —
+ * safe to call on every boot.
  */
 export function seedInitialData() {
   try {
-    const seedPath = path.join(__dirname, 'seed-data.json');
-    if (!fs.existsSync(seedPath)) {
-      console.log('🌱 No seed-data.json found, skipping seed');
+    const seedFiles = fs
+      .readdirSync(__dirname)
+      .filter((f) => /^seed-data.*\.json$/.test(f))
+      .sort();
+
+    if (seedFiles.length === 0) {
+      console.log('🌱 No seed-data*.json files found, skipping seed');
       return;
     }
 
+    for (const file of seedFiles) {
+      seedOne(path.join(__dirname, file));
+    }
+  } catch (e) {
+    console.error('🌱 Seed failed (continuing):', e);
+  }
+}
+
+function seedOne(seedPath: string) {
+  try {
     const seed: SeedSet = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
 
     const existing = db.prepare('SELECT id FROM study_sets WHERE title = ?').get(seed.title) as any;
@@ -81,6 +96,6 @@ export function seedInitialData() {
     const setId = tx();
     console.log(`🌱 Seeded "${seed.title}" with ${seed.items.length} items (set id=${setId})`);
   } catch (e) {
-    console.error('🌱 Seed failed (continuing):', e);
+    console.error(`🌱 Seed failed for ${seedPath} (continuing):`, e);
   }
 }
