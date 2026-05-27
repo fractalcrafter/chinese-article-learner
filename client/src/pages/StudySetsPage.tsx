@@ -55,13 +55,13 @@ export function StudySetsPage() {
 
   const handleHide = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Hide this study set from the list?')) return;
+    if (!confirm('Hide this study set from the list? You can restore it later by editing the set in the database.')) return;
     try {
       await updateStudySet(id, { hidden: true });
       setSets(prev => prev.filter(s => s.id !== id));
     } catch (e) {
       console.error(e);
-      alert('Failed to hide set');
+      alert('Failed to hide set. Please try again or check your connection.');
     }
   };
 
