@@ -9,6 +9,7 @@ type VocabularyRow = {
   chinese: string;
   pinyin: string | null;
   english: string | null;
+  pronunciation_hint?: string | null;
   example_sentence?: string | null;
   emoji?: string | null;
   position?: number;
@@ -46,7 +47,9 @@ function enrichVocabularyInBackground(rows: VocabularyRow[]) {
   void (async () => {
     const enriched = await batchEnrichWords(vocabularyRows.map(row => row.chinese));
     const rowsByChinese = new Map(vocabularyRows.map(row => [row.chinese, row]));
-    const currentStmt = db.prepare('SELECT chinese, pinyin, english FROM vocabulary WHERE id = ?');
+    const currentStmt = db.prepare(
+      'SELECT chinese, pinyin, english, pronunciation_hint FROM vocabulary WHERE id = ?'
+    );
 
     for (const item of enriched) {
       const row = rowsByChinese.get(item.chinese);
@@ -55,9 +58,15 @@ function enrichVocabularyInBackground(rows: VocabularyRow[]) {
       const current = currentStmt.get(row.id) as VocabularyRow | undefined;
       if (!current || current.chinese !== item.chinese) continue;
 
-      const updates: { pinyin?: string; english?: string } = {};
+      const updates: { pinyin?: string; english?: string; pronunciation_hint?: string } = {};
       if (current.pinyin === row.pinyin) updates.pinyin = item.pinyin;
       if (current.english === row.english) updates.english = item.english;
+      if (
+        item.pronunciation_hint &&
+        (current.pronunciation_hint === row.pronunciation_hint || !current.pronunciation_hint)
+      ) {
+        updates.pronunciation_hint = item.pronunciation_hint;
+      }
       updateVocabulary(row.id, updates);
     }
   })().catch(error => {
@@ -167,12 +176,20 @@ router.get('/:id', (req, res) => {
     if (!set) return res.status(404).json({ error: 'Set not found' });
 
     const items = db.prepare(`
-      SELECT v.id, v.chinese, v.pinyin, v.english, v.example_sentence, v.emoji, sv.position
+      SELECT v.id, v.chinese, v.pinyin, v.english, v.example_sentence, v.emoji, v.pronunciation_hint, sv.position
       FROM study_set_vocab sv
       JOIN vocabulary v ON v.id = sv.vocabulary_id
       WHERE sv.set_id = ?
       ORDER BY sv.position ASC, v.id ASC
-    `).all(id);
+    `).all(id) as VocabularyRow[];
+
+    // Backfill missing enrichment (pinyin / english / pronunciation hint) in the background.
+    const needsEnrichment = items.filter(
+      item => !item.pinyin || !item.english || !item.pronunciation_hint
+    );
+    if (needsEnrichment.length > 0) {
+      enrichVocabularyInBackground(needsEnrichment);
+    }
 
     res.json({ ...set, items });
   } catch (e) {
