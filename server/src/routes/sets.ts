@@ -120,7 +120,7 @@ router.get('/', (req, res) => {
       SELECT s.id, s.title, s.description, s.created_at,
         (SELECT COUNT(*) FROM study_set_vocab sv WHERE sv.set_id = s.id) AS item_count
       FROM study_sets s
-      WHERE COALESCE(s.hidden, 0) = 0
+      WHERE s.hidden = 0
       ORDER BY s.created_at DESC
     `).all();
     res.json(sets);
