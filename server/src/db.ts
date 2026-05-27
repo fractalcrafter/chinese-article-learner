@@ -100,6 +100,7 @@ export function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       description TEXT,
+      hidden INTEGER NOT NULL DEFAULT 0,
       created_by INTEGER REFERENCES users(id),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -112,6 +113,11 @@ export function initDatabase() {
       PRIMARY KEY (set_id, vocabulary_id)
     );
   `);
+
+  const studySetColumns = db.prepare('PRAGMA table_info(study_sets)').all() as Array<{ name: string }>;
+  if (!studySetColumns.some(col => col.name === 'hidden')) {
+    db.exec('ALTER TABLE study_sets ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  }
 
   console.log('📚 Database initialized');
 }

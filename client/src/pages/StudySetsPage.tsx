@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, Trash2, Layers, ArrowLeft, Sparkles, Pencil, Check, X } from 'lucide-react';
+import { Loader2, Plus, Trash2, Layers, ArrowLeft, Sparkles, Pencil, Check, X, EyeOff } from 'lucide-react';
 import { getStudySets, createStudySet, deleteStudySet, updateStudySet, type StudySetSummary } from '../lib/api';
 
 export function StudySetsPage() {
@@ -50,6 +50,18 @@ export function StudySetsPage() {
     } catch (e) {
       console.error(e);
       alert('Failed to delete');
+    }
+  };
+
+  const handleHide = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Hide this study set from the list?')) return;
+    try {
+      await updateStudySet(id, { hidden: true });
+      setSets(prev => prev.filter(s => s.id !== id));
+    } catch (e) {
+      console.error(e);
+      alert('Failed to hide set');
     }
   };
 
@@ -224,6 +236,13 @@ export function StudySetsPage() {
                           className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
                         >
                           <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => handleHide(s.id, e)}
+                          aria-label="Hide set"
+                          className="p-2 text-gray-400 hover:text-slate-600 transition-colors"
+                        >
+                          <EyeOff className="w-4 h-4" />
                         </button>
                         <button
                           onClick={(e) => handleDelete(s.id, e)}

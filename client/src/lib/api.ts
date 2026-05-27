@@ -298,7 +298,7 @@ export async function deleteStudySet(id: number): Promise<void> {
 
 export async function updateStudySet(
   id: number,
-  data: { title?: string; description?: string }
+  data: { title?: string; description?: string; hidden?: boolean }
 ): Promise<void> {
   const r = await fetch(`${API_BASE}/sets/${id}`, {
     method: 'PUT',

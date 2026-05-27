@@ -120,6 +120,7 @@ router.get('/', (req, res) => {
       SELECT s.id, s.title, s.description, s.created_at,
         (SELECT COUNT(*) FROM study_set_vocab sv WHERE sv.set_id = s.id) AS item_count
       FROM study_sets s
+      WHERE COALESCE(s.hidden, 0) = 0
       ORDER BY s.created_at DESC
     `).all();
     res.json(sets);
@@ -185,11 +186,12 @@ router.get('/:id', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { title, description } = req.body;
+    const { title, description, hidden } = req.body;
     const fields: string[] = [];
     const values: any[] = [];
     if (title !== undefined) { fields.push('title = ?'); values.push(title); }
     if (description !== undefined) { fields.push('description = ?'); values.push(description); }
+    if (hidden !== undefined) { fields.push('hidden = ?'); values.push(hidden ? 1 : 0); }
     if (fields.length === 0) return res.json({ message: 'No changes' });
     values.push(id);
     db.prepare(`UPDATE study_sets SET ${fields.join(', ')} WHERE id = ?`).run(...values);
