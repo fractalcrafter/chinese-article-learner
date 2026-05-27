@@ -15,6 +15,8 @@ const azureOpenAI = process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENA
     })
     : null;
 const DEPLOYMENT_NAME = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o';
+const BATCH_ENRICH_SIZE = 20;
+const FALLBACK_CONCURRENCY = 5;
 /**
  * Generate a summary of the Chinese article using Azure OpenAI
  */
@@ -191,13 +193,134 @@ export function getPinyin(chinese) {
         return '';
     }
 }
+function chunkWords(words, size) {
+    const chunks = [];
+    for (let i = 0; i < words.length; i += size) {
+        chunks.push(words.slice(i, i + size));
+    }
+    return chunks;
+}
+async function mapWithConcurrency(items, limit, worker) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+    async function runWorker() {
+        while (nextIndex < items.length) {
+            const index = nextIndex;
+            nextIndex++;
+            results[index] = await worker(items[index]);
+        }
+    }
+    const workers = Array.from({ length: Math.min(limit, items.length) }, () => runWorker());
+    await Promise.all(workers);
+    return results;
+}
+async function fallbackEnrichWords(words) {
+    return mapWithConcurrency(words, FALLBACK_CONCURRENCY, async (chinese) => {
+        const english = await translateText(chinese, 'zh-CN', 'en', { useAzure: false });
+        return {
+            chinese,
+            pinyin: getPinyin(chinese),
+            english: english || '(Translation unavailable)',
+        };
+    });
+}
+function parseEnrichedWordsResponse(content) {
+    const jsonStr = content.replace(/```json\n?|\n?```/g, '').trim();
+    const parsed = JSON.parse(jsonStr);
+    const rawItems = Array.isArray(parsed) ? parsed : parsed.words;
+    if (!Array.isArray(rawItems)) {
+        throw new Error('Azure OpenAI enrichment response did not include a words array');
+    }
+    return rawItems
+        .filter((item) => {
+        if (!item || typeof item !== 'object')
+            return false;
+        const candidate = item;
+        return (typeof candidate.chinese === 'string' &&
+            typeof candidate.pinyin === 'string' &&
+            typeof candidate.english === 'string');
+    })
+        .map(item => ({
+        chinese: item.chinese.trim(),
+        pinyin: item.pinyin.trim(),
+        english: item.english.trim(),
+    }));
+}
+async function enrichWordChunk(words) {
+    if (!azureOpenAI) {
+        return fallbackEnrichWords(words);
+    }
+    try {
+        const result = await azureOpenAI.chat.completions.create({
+            model: DEPLOYMENT_NAME,
+            response_format: { type: 'json_object' },
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You are a Chinese-English dictionary and pinyin expert. Respond with valid JSON only.'
+                },
+                {
+                    role: 'user',
+                    content: `Enrich each Chinese word or idiom with context-aware pinyin and concise dictionary-style English.
+
+Rules:
+- Return exactly one entry per input item.
+- Preserve each Chinese input string exactly in the "chinese" field.
+- Use pinyin with tone marks and spaces between syllables.
+- Choose polyphone readings from context. For example, 弹 is "tán" when it means to play a stringed instrument, as in 对牛弹琴.
+- English should be a concise dictionary-style definition with common meanings separated by " / ".
+
+Inputs:
+${JSON.stringify(words)}
+
+Respond with this JSON shape only:
+{
+  "words": [
+    { "chinese": "对牛弹琴", "pinyin": "duì niú tán qín", "english": "to play the lute to a cow / to address the wrong audience" }
+  ]
+}`
+                }
+            ],
+            temperature: 0.1,
+        });
+        const content = result.choices[0]?.message?.content?.trim();
+        if (!content) {
+            throw new Error('Azure OpenAI enrichment returned an empty response');
+        }
+        const enriched = parseEnrichedWordsResponse(content);
+        const byChinese = new Map(enriched
+            .filter(item => item.pinyin && item.english)
+            .map(item => [item.chinese, item]));
+        const missing = words.filter(word => !byChinese.has(word));
+        if (missing.length > 0) {
+            const fallback = await fallbackEnrichWords(missing);
+            for (const item of fallback)
+                byChinese.set(item.chinese, item);
+        }
+        return words.map(word => byChinese.get(word)).filter(Boolean);
+    }
+    catch (error) {
+        console.error('Azure OpenAI batch enrichment failed, falling back:', error);
+        return fallbackEnrichWords(words);
+    }
+}
+/**
+ * Generate context-aware pinyin and dictionary English for a list of words.
+ */
+export async function batchEnrichWords(words) {
+    const cleanWords = words.map(word => word.trim()).filter(Boolean);
+    if (cleanWords.length === 0)
+        return [];
+    const enrichedChunks = await Promise.all(chunkWords(cleanWords, BATCH_ENRICH_SIZE).map(enrichWordChunk));
+    return enrichedChunks.flat();
+}
 /**
  * Translate a single word or phrase using Azure OpenAI for dictionary-quality results
  * Falls back to google-translate if Azure OpenAI is unavailable
  */
-export async function translateText(text, from = 'zh-CN', to = 'en') {
+export async function translateText(text, from = 'zh-CN', to = 'en', options = {}) {
     // Use Azure OpenAI only for Chinese→English (dictionary-quality translations)
-    if (azureOpenAI && from.startsWith('zh') && to === 'en') {
+    if (options.useAzure !== false && azureOpenAI && from.startsWith('zh') && to === 'en') {
         try {
             const result = await azureOpenAI.chat.completions.create({
                 model: DEPLOYMENT_NAME,
