@@ -114,8 +114,8 @@ export function initDatabase() {
     );
   `);
 
-  const studySetColumns = db.prepare('PRAGMA table_info(study_sets)').all() as Array<{ name: string }>;
-  if (!studySetColumns.some(col => col.name === 'hidden')) {
+  const tableColumns = db.prepare('PRAGMA table_info(study_sets)').all() as Array<{ name: string }>;
+  if (!tableColumns.some(col => col.name === 'hidden')) {
     db.exec('ALTER TABLE study_sets ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
   }
 
