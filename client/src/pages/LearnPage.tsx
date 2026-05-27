@@ -381,6 +381,7 @@ export function LearnPage() {
                 let cls = 'border-amber-200 bg-amber-50 hover:bg-amber-100';
                 if (feedback) {
                   if (isCorrect) cls = 'border-green-400 bg-green-50';
+                  else if (feedback.correct) cls = 'border-amber-200 bg-amber-50';
                   else if (isChosen) cls = 'border-red-400 bg-red-50';
                   else cls = 'border-amber-200 bg-amber-50 opacity-50';
                 }
