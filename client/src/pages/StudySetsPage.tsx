@@ -55,7 +55,7 @@ export function StudySetsPage() {
 
   const handleHide = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Hide this study set from the list? You can restore it later by editing the set in the database.')) return;
+    if (!confirm('Hide this study set from the list? You can restore hidden sets later.')) return;
     try {
       await updateStudySet(id, { hidden: true });
       setSets(prev => prev.filter(s => s.id !== id));
