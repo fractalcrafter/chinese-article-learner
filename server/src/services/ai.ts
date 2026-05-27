@@ -40,6 +40,7 @@ export interface EnrichedWord {
   chinese: string;
   pinyin: string;
   english: string;
+  pronunciation_hint: string;
 }
 
 const BATCH_ENRICH_SIZE = 20;
@@ -272,6 +273,7 @@ async function fallbackEnrichWords(words: string[]): Promise<EnrichedWord[]> {
       chinese,
       pinyin: getPinyin(chinese),
       english: english || '(Translation unavailable)',
+      pronunciation_hint: '',
     };
   });
 }
@@ -285,7 +287,7 @@ function parseEnrichedWordsResponse(content: string): EnrichedWord[] {
   }
 
   return rawItems
-    .filter((item: unknown): item is EnrichedWord => {
+    .filter((item: unknown): item is Record<string, unknown> => {
       if (!item || typeof item !== 'object') return false;
       const candidate = item as Record<string, unknown>;
       return (
@@ -295,9 +297,13 @@ function parseEnrichedWordsResponse(content: string): EnrichedWord[] {
       );
     })
     .map(item => ({
-      chinese: item.chinese.trim(),
-      pinyin: item.pinyin.trim(),
-      english: item.english.trim(),
+      chinese: (item.chinese as string).trim(),
+      pinyin: (item.pinyin as string).trim(),
+      english: (item.english as string).trim(),
+      pronunciation_hint:
+        typeof item.pronunciation_hint === 'string'
+          ? (item.pronunciation_hint as string).trim()
+          : '',
     }));
 }
 
@@ -313,11 +319,11 @@ async function enrichWordChunk(words: string[]): Promise<EnrichedWord[]> {
       messages: [
         {
           role: 'system',
-          content: 'You are a Chinese-English dictionary and pinyin expert. Respond with valid JSON only.'
+          content: 'You are a Chinese-English dictionary, pinyin expert, and creative pronunciation coach. Respond with valid JSON only.'
         },
         {
           role: 'user',
-          content: `Enrich each Chinese word or idiom with context-aware pinyin and concise dictionary-style English.
+          content: `Enrich each Chinese word or idiom with context-aware pinyin, concise dictionary-style English, and a creative pronunciation hint.
 
 Rules:
 - Return exactly one entry per input item.
@@ -325,6 +331,7 @@ Rules:
 - Use pinyin with tone marks and spaces between syllables.
 - Choose polyphone readings from context. For example, 弹 is "tán" when it means to play a stringed instrument, as in 对牛弹琴.
 - English should be a concise dictionary-style definition with common meanings separated by " / ".
+- pronunciation_hint: a SHORT memorable mnemonic (under ~90 chars) for an English speaker who can read pinyin but wants help saying it confidently. Give an English sound-alike per syllable in CAPS separated by " · ", then optionally a fun phrase, rhyme, or imagery in quotes that strings the syllables together. Tone is best conveyed through imagery; don't write out tone numbers. Be playful and concrete — strong mnemonics beat literal accuracy.
 
 Inputs:
 ${JSON.stringify(words)}
@@ -332,7 +339,18 @@ ${JSON.stringify(words)}
 Respond with this JSON shape only:
 {
   "words": [
-    { "chinese": "对牛弹琴", "pinyin": "duì niú tán qín", "english": "to play the lute to a cow / to address the wrong audience" }
+    {
+      "chinese": "对牛弹琴",
+      "pinyin": "duì niú tán qín",
+      "english": "to play the lute to a cow / to address the wrong audience",
+      "pronunciation_hint": "DWAY · NEW · TAHN · CHEEN — 'a new suntan queen'"
+    },
+    {
+      "chinese": "狐假虎威",
+      "pinyin": "hú jiǎ hǔ wēi",
+      "english": "to bully others by borrowing power / fox borrows tiger's might",
+      "pronunciation_hint": "WHO · jya · HOO · WAY — 'who-ya, hoo-way!'"
+    }
   ]
 }`
         }

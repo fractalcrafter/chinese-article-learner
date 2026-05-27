@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Volume2, Shuffle, ChevronLeft, ChevronRight,
-  RotateCcw, Check, X, Target, Brain, Undo2,
+  RotateCcw, Check, X, Target, Brain, Undo2, Sparkles,
 } from 'lucide-react';
 import { getStudySet, type StudySet, type StudySetItem } from '../lib/api';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
@@ -388,7 +388,16 @@ export function FlashcardsPage() {
           className="absolute inset-0 flex flex-col items-center justify-center p-6 sm:p-8"
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
         >
-          <p className="text-3xl sm:text-4xl font-medium text-amber-700 mb-3 text-center break-words leading-tight">{item.pinyin}</p>
+          <p className="text-3xl sm:text-4xl font-medium text-amber-700 mb-2 text-center break-words leading-tight">{item.pinyin}</p>
+          {item.pronunciation_hint && (
+            <p
+              className="mb-3 text-xs sm:text-sm text-amber-600 text-center italic flex items-start gap-1 max-w-md"
+              title="How to pronounce"
+            >
+              <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span>{item.pronunciation_hint}</span>
+            </p>
+          )}
           <p className="text-2xl sm:text-3xl text-gray-700 text-center break-words leading-tight">{item.english}</p>
           {item.example_sentence && (
             <p
