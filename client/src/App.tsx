@@ -9,6 +9,7 @@ import { StudySetsPage } from './pages/StudySetsPage';
 import { StudySetDetailPage } from './pages/StudySetDetailPage';
 import { FlashcardsPage } from './pages/FlashcardsPage';
 import { LearnPage } from './pages/LearnPage';
+import { TransparentPngPage } from './pages/TransparentPngPage';
 import { Loader2 } from 'lucide-react';
 import './index.css';
 
@@ -54,6 +55,7 @@ function AppRoutes() {
       <Route path="/sets/:id" element={<ProtectedRoute><StudySetDetailPage /></ProtectedRoute>} />
       <Route path="/sets/:id/flashcards" element={<ProtectedRoute><FlashcardsPage /></ProtectedRoute>} />
       <Route path="/sets/:id/learn" element={<ProtectedRoute><LearnPage /></ProtectedRoute>} />
+      <Route path="/transparent-png" element={<ProtectedRoute><TransparentPngPage /></ProtectedRoute>} />
     </Routes>
   );
 }

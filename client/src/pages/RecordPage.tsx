@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, MicOff, Save, Loader2, AlertCircle, LogOut, Trash2, BookOpen, BarChart3, Layers } from 'lucide-react';
+import { Mic, MicOff, Save, Loader2, AlertCircle, LogOut, Trash2, BookOpen, BarChart3, Layers, ImageDown } from 'lucide-react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { createArticle, getArticles, deleteArticle } from '../lib/api';
 import { useUser } from '../contexts/UserContext';
@@ -147,6 +147,13 @@ export function RecordPage() {
               >
                 <BarChart3 className="w-4 h-4" />
                 <span className="text-sm">Progress</span>
+              </button>
+              <button
+                onClick={() => navigate('/transparent-png')}
+                className="flex items-center gap-1 px-3 py-1 text-gray-500 hover:text-amber-600 transition-colors"
+              >
+                <ImageDown className="w-4 h-4" />
+                <span className="text-sm">PNG</span>
               </button>
               <button
                 onClick={handleLogout}
