@@ -173,11 +173,11 @@ export function TransparentPngPage() {
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Back</span>
           </button>
-          <h1 className="text-2xl sm:text-3xl font-bold text-amber-800 flex items-center gap-2">
-            <ImageDown className="w-7 h-7" />
+          <h1 className="text-xl sm:text-3xl font-bold text-amber-800 flex items-center gap-2 whitespace-nowrap">
+            <ImageDown className="w-6 h-6 sm:w-7 sm:h-7 shrink-0" />
             Transparent PNG
           </h1>
-          <div className="w-16" />
+          <div className="w-12 sm:w-16" />
         </div>
 
         {!file && (

@@ -128,39 +128,43 @@ export function RecordPage() {
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         {/* User Header */}
         {user && (
-          <div className="flex items-center justify-between mb-4 bg-white rounded-xl p-3 shadow-sm">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between mb-4 bg-white rounded-xl p-3 shadow-sm gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <span className="text-2xl">{user.avatar_emoji}</span>
-              <span className="font-medium text-gray-700">{user.name}</span>
+              <span className="font-medium text-gray-700 hidden sm:inline truncate">{user.name}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => navigate('/sets')}
-                className="flex items-center gap-1 px-3 py-1 text-gray-500 hover:text-amber-600 transition-colors"
+                aria-label="Sets"
+                className="flex items-center gap-1 px-2 sm:px-3 py-1 text-gray-500 hover:text-amber-600 transition-colors"
               >
                 <Layers className="w-4 h-4" />
-                <span className="text-sm">Sets</span>
+                <span className="text-sm hidden sm:inline">Sets</span>
               </button>
               <button
                 onClick={() => navigate('/progress')}
-                className="flex items-center gap-1 px-3 py-1 text-gray-500 hover:text-amber-600 transition-colors"
+                aria-label="Progress"
+                className="flex items-center gap-1 px-2 sm:px-3 py-1 text-gray-500 hover:text-amber-600 transition-colors"
               >
                 <BarChart3 className="w-4 h-4" />
-                <span className="text-sm">Progress</span>
+                <span className="text-sm hidden sm:inline">Progress</span>
               </button>
               <button
                 onClick={() => navigate('/transparent-png')}
-                className="flex items-center gap-1 px-3 py-1 text-gray-500 hover:text-amber-600 transition-colors"
+                aria-label="Transparent PNG"
+                className="flex items-center gap-1 px-2 sm:px-3 py-1 text-gray-500 hover:text-amber-600 transition-colors"
               >
                 <ImageDown className="w-4 h-4" />
-                <span className="text-sm">PNG</span>
+                <span className="text-sm hidden sm:inline">PNG</span>
               </button>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1 px-3 py-1 text-gray-500 hover:text-red-500 transition-colors"
+                aria-label="Logout"
+                className="flex items-center gap-1 px-2 sm:px-3 py-1 text-gray-500 hover:text-red-500 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
-                <span className="text-sm">Logout</span>
+                <span className="text-sm hidden sm:inline">Logout</span>
               </button>
             </div>
           </div>
