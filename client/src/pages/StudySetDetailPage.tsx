@@ -74,7 +74,7 @@ export function StudySetDetailPage() {
     [set, hidden]
   );
   const pendingEnrichmentCount = useMemo(
-    () => set ? set.items.filter(i => !i.pinyin || !i.english).length : 0,
+    () => set ? set.items.filter(i => !i.pinyin || !i.english || !i.pronunciation_hint).length : 0,
     [set]
   );
 
@@ -346,7 +346,7 @@ export function StudySetDetailPage() {
           {pendingEnrichmentCount > 0 && (
             <div className="mb-4 flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-700">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Generating pinyin & translations for {pendingEnrichmentCount} {pendingEnrichmentCount === 1 ? 'term' : 'terms'}...
+              Generating pinyin, translations & pronunciation hints for {pendingEnrichmentCount} {pendingEnrichmentCount === 1 ? 'term' : 'terms'}...
             </div>
           )}
 

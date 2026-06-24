@@ -64,6 +64,7 @@ export function initDatabase() {
       english TEXT,
       example_sentence TEXT,
       emoji TEXT,
+      pronunciation_hint TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -113,7 +114,18 @@ export function initDatabase() {
     );
   `);
 
+  // Migrations for existing databases — add columns that may not exist yet
+  ensureColumn('vocabulary', 'pronunciation_hint', 'TEXT');
+
   console.log('📚 Database initialized');
+}
+
+// Add a column to a table if it doesn't already exist (SQLite has no IF NOT EXISTS for columns).
+function ensureColumn(table: string, column: string, type: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (cols.some(c => c.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  console.log(`📚 Migrated: added ${table}.${column}`);
 }
 
 // ============ User functions ============
@@ -338,6 +350,7 @@ export function updateVocabulary(id: number, data: {
   english?: string;
   example_sentence?: string;
   emoji?: string;
+  pronunciation_hint?: string;
 }) {
   const fields: string[] = [];
   const values: any[] = [];
@@ -357,6 +370,10 @@ export function updateVocabulary(id: number, data: {
   if (data.emoji !== undefined) {
     fields.push('emoji = ?');
     values.push(data.emoji);
+  }
+  if (data.pronunciation_hint !== undefined) {
+    fields.push('pronunciation_hint = ?');
+    values.push(data.pronunciation_hint);
   }
 
   if (fields.length === 0) return;

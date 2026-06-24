@@ -250,6 +250,7 @@ export type StudySetItem = {
   english: string | null;
   example_sentence: string;
   emoji: string;
+  pronunciation_hint?: string | null;
   position: number;
 };
 
@@ -328,7 +329,7 @@ export async function removeStudySetItem(setId: number, vocabId: number): Promis
 
 export async function updateVocabularyItem(
   vocabId: number,
-  data: { chinese?: string; pinyin?: string; english?: string; example_sentence?: string; emoji?: string }
+  data: { chinese?: string; pinyin?: string; english?: string; example_sentence?: string; emoji?: string; pronunciation_hint?: string }
 ): Promise<StudySetItem> {
   const r = await fetch(`${API_BASE}/vocabulary/${vocabId}`, {
     method: 'PUT',

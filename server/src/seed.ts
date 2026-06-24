@@ -11,6 +11,7 @@ interface SeedItem {
   english: string | null;
   example_sentence: string | null;
   emoji: string | null;
+  pronunciation_hint?: string | null;
   position: number;
 }
 
@@ -61,7 +62,7 @@ function seedOne(seedPath: string) {
     const getVocabByChinese = db.prepare('SELECT * FROM vocabulary WHERE chinese = ?');
     const insertVocab = db.prepare('INSERT INTO vocabulary (chinese) VALUES (?)');
     const updateVocab = db.prepare(
-      'UPDATE vocabulary SET pinyin = ?, english = ?, example_sentence = ?, emoji = ? WHERE id = ?'
+      'UPDATE vocabulary SET pinyin = ?, english = ?, example_sentence = ?, emoji = ?, pronunciation_hint = ? WHERE id = ?'
     );
     const linkItem = db.prepare(
       'INSERT OR IGNORE INTO study_set_vocab (set_id, vocabulary_id, position) VALUES (?, ?, ?)'
@@ -85,6 +86,7 @@ function seedOne(seedPath: string) {
           item.english ?? vocab.english ?? null,
           item.example_sentence ?? vocab.example_sentence ?? null,
           item.emoji ?? vocab.emoji ?? null,
+          item.pronunciation_hint ?? vocab.pronunciation_hint ?? null,
           vocab.id
         );
         linkItem.run(setId, vocab.id, item.position);

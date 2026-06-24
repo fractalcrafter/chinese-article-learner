@@ -32,7 +32,7 @@ router.get('/:id', (req, res) => {
 // Update vocabulary item
 router.put('/:id', async (req, res) => {
   try {
-    const { chinese, pinyin, english, example_sentence, emoji } = req.body;
+    const { chinese, pinyin, english, example_sentence, emoji, pronunciation_hint } = req.body;
     const id = parseInt(req.params.id);
 
     if (typeof chinese === 'string' && chinese.trim()) {
@@ -58,8 +58,9 @@ router.put('/:id', async (req, res) => {
           console.error('Translation failed during edit:', e);
         }
 
+        // Reset pronunciation_hint so background enrichment regenerates it for the new term.
         db.prepare(
-          'UPDATE vocabulary SET chinese = ?, pinyin = ?, english = ? WHERE id = ?'
+          'UPDATE vocabulary SET chinese = ?, pinyin = ?, english = ?, pronunciation_hint = NULL WHERE id = ?'
         ).run(trimmed, newPinyin, newEnglish, id);
 
         const refreshed = db.prepare('SELECT * FROM vocabulary WHERE id = ?').get(id);
@@ -67,7 +68,7 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    updateVocabulary(id, { pinyin, english, example_sentence, emoji });
+    updateVocabulary(id, { pinyin, english, example_sentence, emoji, pronunciation_hint });
 
     const updated = db.prepare('SELECT * FROM vocabulary WHERE id = ?').get(id);
     res.json(updated);
